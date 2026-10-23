@@ -65,7 +65,12 @@ Clean table columns: date, store_nbr, family, sales, onpromotion, is_closed, cit
    Saved: models/lgbm_final.txt + lgbm_final_info.json, reports/category_errors.csv, test_predictions.csv, q9–q11.
    For Stage 6: safety buffers from category WAPE must be capped/handled for tiny categories (e.g. BOOKS 420%) — agree the rule with me first.
    make_stage5.py creates src/features.py (shared feature code) and notebooks/04_evaluation.ipynb: final test on locked 14 days, error per category (saves reports/category_errors.csv), perishable vs long-life, low vs top sellers, Christmas 2016 back-test (12–25 Dec 2016, Extra 1), and trains the final model on all data → models/lgbm_final.txt + lgbm_final_info.json. Uses the no-weather feature set automatically if it had lower validation error.
-6. Reorder engine + Streamlit dashboard — TODO
+6. Reorder engine + Streamlit dashboard — IN PROGRESS
+   6a Forecast engine — DONE: src/forecast.py (python3 src/forecast.py) → reports/forecast_next14.csv, 2017-08-16..2017-08-29, 24,206 rows (54 stores × 33 categories minus never_sold). Reuses src/features.py unchanged; holiday flags rebuilt with the 01_cleaning rules (verified identical on history); adds 60 calendar-only days so days_to_holiday sees the 9 Oct holiday (54 → 41).
+      Total forecast 10,765,373 units vs 11,444,795 in the last 14 days (−5.9%). With promotions = 0 (agreed). Diagnostic only: planned promotions from raw/store_sales/test.csv would give +3.4% — using them needs my OK.
+      Edge effect found: in the original features, days_to_holiday on 2017-08-12..15 was 60 (data ended) instead of 55–58; only those 4 days, tiny effect on lgbm_final.
+   6b Reorder engine — NEXT (needs agreed buffer cap for tiny categories + simulated stock rule)
+   6c conditions_rules.csv (with me), 6d Streamlit app
    - Forecast the 14 days after 2017-08-15 with models/lgbm_final.txt + src/features.py (build future rows; future onpromotion unknown → assume 0 and say so).
    - order = forecast over window + safety buffer − current stock, minimum 0. Window: perishables 2–3 days, long-life 14 days. Buffer from each category's test WAPE (reports/category_errors.csv). Current stock is SIMULATED (dataset has none) and labelled so.
    - conditions_rules.csv (written together with me): India condition → product groups, with a season column. Examples: Diwali → sweets, chocolates, gifts, toys, decor; Holi → colours, sweets; Raksha Bandhan → rakhis, sweets, gifts; Monsoon (Jun–Sep) / rainy → umbrellas, raincoats, quick-dry clothes, mosquito repellent, tea, snacks; Winter (Nov–Feb) → hoodies, sweatshirts, moisturiser; Summer (Mar–Jun) → cold drinks, ice cream, curd, ORS, sunscreen. These are rule-based assumptions, not model output — label them so.
