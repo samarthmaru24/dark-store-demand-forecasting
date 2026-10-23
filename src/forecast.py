@@ -1,7 +1,8 @@
 # Stage 6a: forecast the next H = 14 days after the last day in the data, with models/lgbm_final.txt.
 # Uses src/features.py unchanged. Every past-sales clue is at least 14 days old, so the 14 future
 # days only need sales up to the last data day: no recursive forecasting.
-# Assumptions (say so in the dashboard): future onpromotion = 0, all stores open, no earthquake.
+# Assumptions (say so in the dashboard): onpromotion = planned promotions from raw/store_sales/test.csv
+# (the store knows its promotion calendar; 0 where no plan), all stores open, no earthquake.
 # Run from the project root: python3 src/forecast.py
 import json
 import sys
@@ -38,7 +39,7 @@ def holiday_flags(rows, holidays):
     return out
 
 
-def future_rows(raw, holidays, days):
+def future_rows(raw, holidays, promos, days):
     # One row per (store, category) pair and future day. sales / oil / transactions unknown (NaN).
     last = raw.date.max()
     dates = pd.date_range(last + pd.Timedelta(days=1), periods=days)
@@ -47,7 +48,8 @@ def future_rows(raw, holidays, days):
     fut = pairs.merge(pd.DataFrame({"date": dates}), how="cross")
     fut = holiday_flags(fut, holidays)
     fut["sales"] = np.nan
-    fut["onpromotion"] = 0          # unknown -> assumed 0
+    fut = fut.merge(promos, on=["date", "store_nbr", "family"], how="left")
+    fut["onpromotion"] = fut["onpromotion"].fillna(0).astype(int)   # no plan -> 0
     fut["is_closed"] = 0
     fut["dcoilwtico"] = np.nan
     fut["transactions"] = np.nan
@@ -64,9 +66,11 @@ def make_forecast():
     raw = raw[raw.never_sold == 0].copy()
     holidays = pd.read_csv(RAW / "holidays_events.csv", parse_dates=["date"])
     weather = pd.read_csv(ROOT / "raw" / "weather_ecuador" / "weather.csv", parse_dates=["date"])
+    # test.csv is used ONLY for planned onpromotion (it has no sales)
+    promos = pd.read_csv(RAW / "test.csv", parse_dates=["date"])[["date", "store_nbr", "family", "onpromotion"]]
 
     last = raw.date.max()
-    full = pd.concat([raw, future_rows(raw, holidays, H + EXTRA_DAYS)], ignore_index=True)
+    full = pd.concat([raw, future_rows(raw, holidays, promos, H + EXTRA_DAYS)], ignore_index=True)
     df = build_features(full, weather)
     fut = df[(df.date > last) & (df.date <= last + pd.Timedelta(days=H))].copy()
     fut["forecast"] = np.expm1(booster.predict(fut[info["features"]])).clip(0)
@@ -75,7 +79,9 @@ def make_forecast():
 
 if __name__ == "__main__":
     df, fut, info, last = make_forecast()
-    out = fut[["date", "store_nbr", "family", "is_perishable", "forecast"]].copy()
+    print("Rows with a planned promotion value:", f"{fut.onpromotion.gt(0).sum():,}", "of", f"{len(fut):,}",
+          "| avg planned onpromotion:", round(fut.onpromotion.mean(), 2))
+    out = fut[["date", "store_nbr", "family", "is_perishable", "onpromotion", "forecast"]].copy()
     out["family"] = out.family.astype(str)
     out["forecast"] = out.forecast.round(2)
     out.to_csv(REPORTS / "forecast_next14.csv", index=False)

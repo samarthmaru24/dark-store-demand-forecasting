@@ -1,0 +1,13 @@
+type,name,season,months,lead_days,india_products,related_categories,extra_stock_pct
+festival,Diwali,Festival,,7,sweets; chocolates; dry fruits; gift hampers; diyas and candles; decor lights; toys; puja items,CELEBRATION; GROCERY I; HOME AND KITCHEN I; PLAYERS AND ELECTRONICS; BEAUTY,30
+festival,Holi,Festival,,5,gulal colours; water guns; sweets; thandai; snacks,CELEBRATION; GROCERY I; BEVERAGES,25
+festival,Raksha Bandhan,Festival,,5,rakhis; sweets; chocolates; gift boxes,CELEBRATION; GROCERY I,25
+festival,Ganesh Chaturthi,Festival,,5,modak and sweets; puja items; flowers; decor,CELEBRATION; GROCERY I; PRODUCE,20
+festival,Dussehra,Festival,,7,fasting foods; fruits; puja items; ethnic wear; sweets,GROCERY I; PRODUCE; LADIESWEAR,20
+festival,Id-ul-Fitr,Festival,,5,sewai; dates; dry fruits; meat; attar,GROCERY I; MEATS; POULTRY; BEAUTY,25
+festival,Christmas,Festival,,7,cakes; chocolates; decor; party snacks; drinks,BREAD/BAKERY; CELEBRATION; BEVERAGES; GROCERY I,25
+festival,Karwa Chauth,Festival,,3,sweets; dry fruits; puja thali; cosmetics,GROCERY I; BEAUTY,15
+season,Summer,Summer,3;4;5;6,,cold drinks; ice cream; curd and lassi; ORS; sunscreen; cotton wear,BEVERAGES; DAIRY; FROZEN FOODS; PERSONAL CARE,20
+season,Monsoon,Monsoon,6;7;8;9,,umbrellas; raincoats; quick-dry clothes; mosquito repellent; tea; instant noodles; snacks,HOME CARE; GROCERY I; BEVERAGES,15
+season,Winter,Winter,11;12;1;2,,hoodies; sweatshirts; thermals; moisturiser; cold cream; soup; tea and coffee,PERSONAL CARE; BEAUTY; GROCERY I; BEVERAGES,15
+weather,Rainy day,Monsoon,,1,umbrellas; raincoats; tea; snacks; instant noodles,HOME CARE; GROCERY I; BEVERAGES,10
