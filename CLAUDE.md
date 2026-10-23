@@ -85,7 +85,9 @@ Clean table columns: date, store_nbr, family, sales, onpromotion, is_closed, cit
       Pipeline order: python3 src/forecast.py → python3 src/reorder.py → python3 src/build_app_data.py.
       Boosts: boosted_order = order + forecast_window × extra_stock_pct for active rules (festivals whose "start stocking by" date has arrived, the current season, rainy-day if the rain check found ≥ 5 mm). If several rules match a family, the largest % is used (no stacking). Season filter keeps only that season's rules.
       Seasons from planning-date month: Summer Mar–May, Monsoon Jun–Sep (wins June), Winter Nov–Feb; October has no season rule.
-      Rain: Open-Meteo forecast API (precipitation_sum, 7 days, real today); friendly message if it fails.
+      Weather alerts: Open-Meteo forecast API (precipitation_sum, temperature_2m_max/min, 7 days, real today, 8 Indian cities); friendly message if it fails.
+      Thresholds (assumptions): Rainy day rain ≥ 5 mm (Monsoon), Cold day max ≤ 15 °C (Winter), Hot day max ≥ 40 °C (Summer). "Cold day" and "Hot day" rows added to conditions_rules.csv (+10%, lead 1 day), same pattern as "Rainy day".
+      Dummy/synthetic data: used ONLY to test that alerts trigger (never for training or accuracy numbers).
       Trending: last 7 days vs previous 28 days average units/day, open days only, categories under 1 unit/day skipped. Heatmap uses a log colour scale (hover = exact units).
       Smoke test (2026-10-24): store 44 next 14 days 578,586 units (+1.5% vs last 14 days), 4 Urgent, 19 Reorder; 0 exceptions in AppTest runs and server log.
    DASHBOARD DATE DESIGN: the forecast/reorder side uses the data's "today" = 2017-08-15 (Ecuador demo). The India festival/season panel uses an "India planning date" picker (default = real today), clearly labelled as a separate, rule-based panel.

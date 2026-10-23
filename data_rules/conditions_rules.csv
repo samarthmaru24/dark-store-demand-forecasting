@@ -11,3 +11,5 @@ season,Summer,Summer,3;4;5;6,,cold drinks; ice cream; curd and lassi; ORS; sunsc
 season,Monsoon,Monsoon,6;7;8;9,,umbrellas; raincoats; quick-dry clothes; mosquito repellent; tea; instant noodles; snacks,HOME CARE; GROCERY I; BEVERAGES,15
 season,Winter,Winter,11;12;1;2,,hoodies; sweatshirts; thermals; moisturiser; cold cream; soup; tea and coffee,PERSONAL CARE; BEAUTY; GROCERY I; BEVERAGES,15
 weather,Rainy day,Monsoon,,1,umbrellas; raincoats; tea; snacks; instant noodles,HOME CARE; GROCERY I; BEVERAGES,10
+weather,Cold day,Winter,,1,hoodies; sweatshirts; thermals; tea and coffee; soup; moisturiser,PERSONAL CARE; BEAUTY; GROCERY I; BEVERAGES,10
+weather,Hot day,Summer,,1,cold drinks; ice cream; curd and lassi; ORS; sunscreen,BEVERAGES; DAIRY; FROZEN FOODS; PERSONAL CARE,10

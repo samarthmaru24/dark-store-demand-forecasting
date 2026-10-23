@@ -26,8 +26,8 @@ def data():
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def rain(city):
-    return L.rain_forecast(city)
+def weather(city):
+    return L.weather_forecast(city)
 
 
 @st.cache_data
@@ -165,12 +165,12 @@ with st.container():
 # ---------------- Reorder table ----------------
 st.subheader("Reorder plan")
 plan = d["plan"][(d["plan"].store_nbr == store) & d["plan"].family.isin(fams)].copy()
-rainy = False
-rain_city = st.session_state.get("rain_city", "Mumbai")
+alerts = {}
+weather_city = st.session_state.get("weather_city", "Mumbai")
 if boost_on:
-    rdf, _ = rain(rain_city)
-    rainy = rdf is not None and bool((rdf.rain_mm >= L.RAINY_MM).any())
-    plan = L.apply_boosts(plan, L.active_rules(d, planning_date, season_filter, rainy))
+    wdf, _ = weather(weather_city)
+    alerts = L.weather_alerts(wdf) if wdf is not None else {}
+    plan = L.apply_boosts(plan, L.active_rules(d, planning_date, season_filter, alerts))
 plan["status_rank"] = plan.status.map({"Urgent": 0, "Reorder": 1, "OK": 2})
 plan = plan.sort_values(["status_rank", "order_qty"], ascending=[True, False])
 table = pd.DataFrame({
@@ -195,7 +195,8 @@ st.caption("Order = forecast over window + safety buffer − stock, minimum 0. W
            "**Stock is SIMULATED** (the dataset has no stock data).")
 if boost_on:
     st.caption(f"Boosts use the India planning date {planning_date}, season filter “{season_filter}”"
-               f"{', rainy-day alert for ' + rain_city if rainy else ''}. If several rules match, the largest "
+               f"{', weather alerts for ' + weather_city + ': ' + ', '.join(alerts) if alerts else ''}. "
+               "If several rules match, the largest "
                "extra % is used. Rule-based assumption, not model output.")
 st.download_button("Download reorder plan (CSV)", table.to_csv(index=False).encode(),
                    file_name=f"reorder_plan_store_{store}.csv", mime="text/csv")
@@ -234,29 +235,48 @@ elif season_filter == "Festival":
 else:
     st.info(f"{season_filter} is out of season on {planning_date:%d %b}, so its products are hidden.")
 
-st.subheader("Rainy-day alert")
-city = st.selectbox("City", list(L.INDIA_CITIES), key="rain_city")
-rdf, err = rain(city)
+st.subheader("Weather alerts (next 7 days)")
+city = st.selectbox("City", list(L.INDIA_CITIES), key="weather_city")
+wdf, err = weather(city)
 if err:
     st.info(err)
 else:
-    wet = rdf[rdf.rain_mm >= L.RAINY_MM]
-    fig = go.Figure(go.Bar(x=rdf.date.dt.strftime("%a %d %b"), y=rdf.rain_mm, marker=dict(
-        color=[SERIES[0] if v >= L.RAINY_MM else BLUES[1] for v in rdf.rain_mm], cornerradius=4),
+    days = wdf.date.dt.strftime("%a %d")
+    wl, wr = st.columns(2)
+    fig = go.Figure(go.Bar(x=days, y=wdf.rain_mm, marker=dict(
+        color=[SERIES[0] if v >= L.RAINY_MM else BLUES[1] for v in wdf.rain_mm], cornerradius=4),
         hovertemplate="%{x}<br>%{y:.1f} mm<extra></extra>"))
-    style(fig, 220, ytitle="rain (mm)")
-    fig.add_hline(y=L.RAINY_MM, line=dict(color=MUTED, width=1, dash="dot"), annotation_text="rainy day = 5 mm",
-                  annotation_font_color=INK2)
-    st.plotly_chart(fig, width="stretch")
-    if wet.empty:
-        st.success(f"No rainy day (≥ {L.RAINY_MM} mm) expected in {city} in the next 7 days.")
-    elif season_filter in ("All", "Monsoon"):
-        st.warning(f"🌧 **Rainy day expected in {city}** on {', '.join(wet.date.dt.strftime('%a %d %b'))}. "
-                   f"Stock up: {rules.loc['Rainy day', 'india_products']} "
-                   f"(+{rules.loc['Rainy day', 'extra_stock_pct']}% for {rules.loc['Rainy day', 'related_categories']}).")
-    else:
-        st.info(f"Rainy day expected in {city}; the rainy-day rule is hidden by the season filter (“{season_filter}”).")
-    st.caption("Live forecast from the free Open-Meteo API (real today, not the planning date).")
+    style(fig, 240, ytitle="rain (mm)")
+    fig.update_layout(hovermode="closest", title=dict(text="Rain", font=dict(size=14, color=INK)))
+    fig.add_hline(y=L.RAINY_MM, line=dict(color=MUTED, width=1, dash="dot"),
+                  annotation_text=f"rainy day = {L.RAINY_MM} mm", annotation_font_color=INK2)
+    wl.plotly_chart(fig, width="stretch")
+    fig = go.Figure(go.Scatter(x=days, y=wdf.temp_max, mode="lines+markers", line=dict(color=SERIES[1], width=2),
+                               marker=dict(size=8), customdata=wdf.temp_min,
+                               hovertemplate="%{x}<br>max %{y:.1f} °C · min %{customdata:.1f} °C<extra></extra>"))
+    style(fig, 240, ytitle="max temperature (°C)")
+    fig.update_layout(hovermode="closest", title=dict(text="Max temperature", font=dict(size=14, color=INK)))
+    for y, label in [(L.COLD_MAX_C, f"cold day ≤ {L.COLD_MAX_C} °C"), (L.HOT_MAX_C, f"hot day ≥ {L.HOT_MAX_C} °C")]:
+        if wdf.temp_max.min() - 8 <= y <= wdf.temp_max.max() + 8:      # draw a threshold only when it's near
+            fig.add_hline(y=y, line=dict(color=MUTED, width=1, dash="dot"), annotation_text=label,
+                          annotation_font_color=INK2)
+    wr.plotly_chart(fig, width="stretch")
+
+    alerts_now = L.weather_alerts(wdf)
+    icons = {"Rainy day": "🌧", "Cold day": "🥶", "Hot day": "🥵"}
+    if not alerts_now:
+        st.success(f"No weather alert for {city} in the next 7 days (rain < {L.RAINY_MM} mm, "
+                   f"max temperature between {L.COLD_MAX_C} and {L.HOT_MAX_C} °C).")
+    for name, dates in alerts_now.items():
+        r = rules.loc[name]
+        when = ", ".join(pd.to_datetime(dates).strftime("%a %d %b"))
+        if season_filter in ("All", r.season):
+            st.warning(f"{icons[name]} **{name} expected in {city}** on {when}. Stock up: {r.india_products} "
+                       f"(+{r.extra_stock_pct}% for {r.related_categories}).")
+        else:
+            st.info(f"{name} expected in {city}; this {r.season} rule is hidden by the season filter (“{season_filter}”).")
+    st.caption(f"Live forecast from the free Open-Meteo API (real today, not the planning date). Thresholds are "
+               f"assumptions: rainy ≥ {L.RAINY_MM} mm, cold ≤ {L.COLD_MAX_C} °C max, hot ≥ {L.HOT_MAX_C} °C max.")
 
 # ---------------- Perishable vs long-life ----------------
 st.divider()

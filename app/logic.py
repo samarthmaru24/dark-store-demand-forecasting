@@ -16,7 +16,10 @@ INDIA_CITIES = {  # lat, lon
     "Mumbai": (19.08, 72.88), "Delhi": (28.61, 77.21), "Bengaluru": (12.97, 77.59), "Chennai": (13.08, 80.27),
     "Kolkata": (22.57, 88.36), "Hyderabad": (17.39, 78.49), "Pune": (18.52, 73.86), "Ahmedabad": (23.02, 72.57),
 }
-RAINY_MM = 5
+# Weather alert thresholds (assumptions, not model output)
+RAINY_MM = 5          # daily rain >= 5 mm -> "Rainy day"
+COLD_MAX_C = 15       # daily max temperature <= 15 °C -> "Cold day"
+HOT_MAX_C = 40        # daily max temperature >= 40 °C -> "Hot day"
 
 
 def load_data():
@@ -137,17 +140,16 @@ def india_festivals(d, planning_date, within_days=45):
     return pd.DataFrame(rows, columns=cols).sort_values("date").reset_index(drop=True)
 
 
-def active_rules(d, planning_date, season_filter="All", rainy=False):
+def active_rules(d, planning_date, season_filter="All", weather_rules=()):
     # Rules that apply on the planning date: festivals whose stocking date has arrived, the current season,
-    # and the rainy-day rule if the rain check found a rainy day. The season filter keeps only that season.
+    # and the weather rules the live forecast triggered. The season filter keeps only that season.
     rules = d["rules"]
     fest = india_festivals(d, planning_date)
     names = list(fest[fest.stock_now].festival)
     season = current_season(planning_date)
     if season:
         names.append(season)
-    if rainy:
-        names.append("Rainy day")
+    names += list(weather_rules)
     act = rules[rules.name.isin(names)]
     if season_filter != "All":
         act = act[act.season == season_filter]
@@ -171,20 +173,31 @@ def apply_boosts(plan, rules):
     return plan
 
 
-def rain_forecast(city):
-    # Next 7 days of rain from the free Open-Meteo forecast API. Returns (DataFrame, None) or (None, message).
+def weather_forecast(city):
+    # Next 7 days of rain and temperature from the free Open-Meteo forecast API.
+    # Returns (DataFrame, None) or (None, message).
     lat, lon = INDIA_CITIES[city]
     try:
         r = requests.get("https://api.open-meteo.com/v1/forecast", timeout=8, params={
-            "latitude": lat, "longitude": lon, "daily": "precipitation_sum",
+            "latitude": lat, "longitude": lon,
+            "daily": "precipitation_sum,temperature_2m_max,temperature_2m_min",
             "forecast_days": 7, "timezone": "Asia/Kolkata"})
         r.raise_for_status()
         day = r.json()["daily"]
-        df = pd.DataFrame({"date": pd.to_datetime(day["time"]), "rain_mm": day["precipitation_sum"]})
+        df = pd.DataFrame({"date": pd.to_datetime(day["time"]), "rain_mm": day["precipitation_sum"],
+                           "temp_max": day["temperature_2m_max"], "temp_min": day["temperature_2m_min"]})
         df["rain_mm"] = df.rain_mm.fillna(0)
         return df, None
     except Exception:
         return None, "Weather forecast is not available right now (no internet or the free API is busy). Try again later."
+
+
+def weather_alerts(wdf):
+    # {rule name: list of dates} for every weather rule the 7-day forecast triggers
+    checks = {"Rainy day": wdf.rain_mm >= RAINY_MM,
+              "Cold day": wdf.temp_max <= COLD_MAX_C,
+              "Hot day": wdf.temp_max >= HOT_MAX_C}
+    return {name: list(wdf.date[hit]) for name, hit in checks.items() if hit.any()}
 
 
 def shelf_life_split(d, store, fams):
