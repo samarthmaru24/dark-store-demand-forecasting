@@ -55,7 +55,15 @@ Clean table columns: date, store_nbr, family, sales, onpromotion, is_closed, cit
    Split: train 2015-01-01..2017-07-18 (1,538,954 rows), valid 2017-07-19..2017-08-01 (24,206 rows), test locked 2017-08-02..2017-08-15.
    Validation WAPE: baseline (average of last 14 days) 21.81%, LightGBM 12.82%, LightGBM without weather 12.74% → about 41% better than baseline. Weather did NOT help (honest finding). Top features: lag_14 51%, mean_7 26%, mean_28 16%.
    Note: the city "Libertad" geocoded to a place near Guayaquil, not the coastal town — no impact since weather isn't used.
-5. Test & understand results — NEXT
+5. Test & understand results — DONE (notebooks/04_evaluation_run.ipynb, checksums in CHECKSUMS.txt)
+   Results (as printed): Use weather: False | 31 features | 140 trees. Train 2015-01-01..2017-08-01, Test 2017-08-02..2017-08-15.
+   Test WAPE: baseline 21.98% (MAE 103.91), LightGBM 15.51% (MAE 73.34) → 29.4% lower than baseline.
+   Test (15.5%) is worse than validation (12.7%): mostly 12–13 Aug (weekend after the 11 Aug transferred national holiday), over-forecast by ~21%; the model has no "days since holiday" feature. Diagnostic only: 13.63% without those 2 days — the official number stays 15.51%.
+   Easiest: PRODUCE 10.1, BREAD/BAKERY 12.6, DAIRY 12.7, GROCERY I 12.7, MEATS 13.5. Hardest: SCHOOL AND OFFICE SUPPLIES 70.2 (back-to-school season), HARDWARE 73.9, BABY CARE 134.6, HOME APPLIANCES 192.8, BOOKS 420.0 (tiny bases ≤1.4 units/day → WAPE not meaningful; BOOKS model worse than baseline).
+   Perishable 12.0% vs long-life 17.2%. Low sellers 52.2%, medium 24.5%, top 15.1%.
+   Christmas 2016 back-test (closed 25 Dec excluded): LightGBM 20.1% vs baseline 27.9%; total units −11.0% (baseline −13.2%); FROZEN FOODS predicted 445,398 vs actual 795,112 (catches part of the rush, not all).
+   Saved: models/lgbm_final.txt + lgbm_final_info.json, reports/category_errors.csv, test_predictions.csv, q9–q11.
+   For Stage 6: safety buffers from category WAPE must be capped/handled for tiny categories (e.g. BOOKS 420%) — agree the rule with me first.
    make_stage5.py creates src/features.py (shared feature code) and notebooks/04_evaluation.ipynb: final test on locked 14 days, error per category (saves reports/category_errors.csv), perishable vs long-life, low vs top sellers, Christmas 2016 back-test (12–25 Dec 2016, Extra 1), and trains the final model on all data → models/lgbm_final.txt + lgbm_final_info.json. Uses the no-weather feature set automatically if it had lower validation error.
 6. Reorder engine + Streamlit dashboard — TODO
    - Forecast the 14 days after 2017-08-15 with models/lgbm_final.txt + src/features.py (build future rows; future onpromotion unknown → assume 0 and say so).
