@@ -1,0 +1,57 @@
+{
+  "features": [
+    "store_id",
+    "family",
+    "city",
+    "store_type",
+    "cluster",
+    "is_perishable",
+    "dayofweek",
+    "day",
+    "month",
+    "weekofyear",
+    "dayofyear",
+    "is_payday",
+    "is_holiday",
+    "is_national_holiday",
+    "is_regional_holiday",
+    "is_local_holiday",
+    "is_event",
+    "is_quake",
+    "days_to_holiday",
+    "onpromotion",
+    "lag_14",
+    "lag_21",
+    "lag_28",
+    "lag_35",
+    "lag_42",
+    "mean_7",
+    "mean_28",
+    "mean_56",
+    "std_28",
+    "trans_lag14",
+    "oil_lag14",
+    "rain_mm",
+    "temp_max",
+    "rainy_day"
+  ],
+  "best_iteration": 140,
+  "horizon_days": 14,
+  "train_start": "2015-01-01",
+  "valid_start": "2017-07-19",
+  "test_start": "2017-08-02",
+  "results_valid": {
+    "Baseline (14-day average)": {
+      "MAE": 108.06,
+      "WAPE": 21.812
+    },
+    "LightGBM (all features)": {
+      "MAE": 63.519,
+      "WAPE": 12.821
+    },
+    "LightGBM (no weather)": {
+      "MAE": 63.122,
+      "WAPE": 12.741
+    }
+  }
+}

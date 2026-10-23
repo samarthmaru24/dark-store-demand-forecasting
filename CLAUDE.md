@@ -1,0 +1,69 @@
+# Dark Store Demand Forecasting — project context
+
+## Who / how
+- I'm Samarth, a university student. This is my DSML project. Explain things in simple, short English.
+- Accuracy matters less than CORRECTNESS: every number must be honest and reproducible.
+- After each stage: short report, then STOP and wait for me.
+
+## End goal
+Quick-commerce companies (Blinkit, Zepto, Instamart) run small "dark stores". Running out of an item = bad customer experience; overstocking = waste.
+Build an ML model that predicts units sold per store × product category for the next 14 days, turn it into a reorder list, and show it in a Streamlit dashboard with:
+- store dropdown
+- next-14-day forecast chart per category
+- current-demand graph (last 30 days actual joined to the forecast)
+- "Trending now" (categories most above their usual level this week)
+- reorder table (red when stock runs out soon)
+- festival alerts for India (e.g. "Diwali in N days — stock up sweets, gifts, toys")
+- season filter (Summer / Monsoon / Winter / Festival) that hides out-of-season items
+- perishable vs long-life view
+The project has 3 "extras": (1) festival effect, (2) perishable vs long-life predictability, (3) reorder dashboard.
+
+## Data
+Main training data: Kaggle "Store Sales – Time Series Forecasting" (Favorita, Ecuador): 54 stores, 33 product categories, daily, 2013-01-01 to 2017-08-15. Ecuador stands in for Indian dark stores (honest limitation).
+Folder: ~/DSML-Project
+- raw/store_sales/       train, stores, holidays_events, oil, transactions CSVs (test.csv ignored)
+- raw/online_retail/     UCI Online Retail II (UK gifts) — optional, winter/gift analysis only
+- raw/weather_ecuador/   weather.csv (date, city, rain_mm, temp_max), 37,136 rows, Open-Meteo, 22 cities — the ONE code-generated file allowed in raw/ (written by 03_model when missing; external API download = raw data)
+- raw/national_holiday/, raw/extra/ (m5, favorita full, Diwali datasets, archive) — NOT used for training
+- clean/store_sales_clean.parquet — cleaned table, 2,785,464 rows × 21 columns
+- notebooks/ 01_cleaning, 02_eda, 03_model (+ 03_model_run = executed copy)
+- models/ lgbm_v1.txt, lgbm_v1_info.json
+- reports/ charts q1–q6 and q8 (no q7), festival_effect.csv
+- src/, app/ — empty so far (except .gitkeep)
+- make_03_model.py (generator for 03_model.ipynb), make_stage5.py (generator for Stage 5, not yet run)
+- CHECKSUMS.txt — SHA-256 of every generator script and the files it creates
+- .gitignore excludes raw/ and clean/ (data never goes to GitHub). Local git repo initialised here; GitHub remote is connected in Stage 7.
+Clean table columns: date, store_nbr, family, sales, onpromotion, is_closed, city, state, store_type, cluster, is_event, is_national_holiday, is_regional_holiday, is_local_holiday, is_holiday, dcoilwtico, transactions, is_payday, is_quake, is_perishable, never_sold.
+"sales" = UNITS sold (not money). Never write $, ₹ or "revenue".
+
+## HARD RULES (always)
+1. Never modify, move or delete anything in raw/. Only exception: raw/weather_ecuador/weather.csv may be (re)downloaded by code. No other code may write to raw/.
+2. The 14-day rule: any past sales / oil / transactions feature must be at least 14 days old. No same-day oil or transactions. Split by time, never shuffle.
+3. Test period 2017-08-02 to 2017-08-15 is locked — used only in Stage 5, once.
+4. Report only numbers actually printed by code.
+5. Never silently change agreed logic or rewrite a pre-written notebook. If a change is needed: explain what and why, smallest fix, and wait for my OK.
+6. Pre-written files come from generator scripts with SHA-256 checksums; always verify the checksum before running.
+
+## Roadmap (7 stages) and status
+1. Plan & setup — DONE (folders, GitHub, Kaggle, Python libs)
+2. Get & clean data — DONE
+   Rules: missing days (25 Dec) added with is_closed=1; store-days with 0 total sales across all categories also is_closed=1 (e.g. 1 Jan); rows before each store's first sale dropped (8 stores opened late, store 52 only on 2017-04-20); holidays: drop transferred=True and "Work Day"; National = all stores, Regional = match state, Local = match city, "Event" → is_event; oil ffill then bfill; is_payday = 15th or month-end; is_quake = 2016-04-16..2016-05-15; is_perishable = BREAD/BAKERY, DAIRY, DELI, EGGS, MEATS, POULTRY, PREPARED FOODS, PRODUCE, SEAFOOD; never_sold = store×category pairs with zero total sales (53 pairs).
+3. Explore data (EDA) — DONE
+   Findings: top 3 = GROCERY I 32%, BEVERAGES 20%, PRODUCE 11% of units; Sunday +29%, Thursday −21% vs average; avg units/day grew from about 385k (2013) to 856k (2017); holiday-day lift (holiday vs normal days): FROZEN FOODS +223%, LIQUOR,WINE,BEER +124%; build-up (days just before holidays vs normal days): FROZEN FOODS +92.9%, LIQUOR,WINE,BEER +73.8%; BOOKS lift (+76%) is from a tiny base (0.07 → 0.13 units/day), not meaningful; jumpiness (CV) perishable 0.38 vs long-life 1.07 — mainly because many long-life categories sell very few units; promotion lifts are a link, not proof; payday +1%.
+4. Build model — DONE (notebooks/03_model.ipynb, verified by checksum)
+   LightGBM on log1p(sales), 34 features: store/category info, calendar, holiday flags, days_to_holiday, onpromotion, lag_14/21/28/35/42, mean_7/28/56 and std_28 of sales shifted 14 days, trans_lag14, oil_lag14, rain_mm, temp_max, rainy_day. Closed days excluded from training; never_sold pairs dropped.
+   Split: train 2015-01-01..2017-07-18 (1,538,954 rows), valid 2017-07-19..2017-08-01 (24,206 rows), test locked 2017-08-02..2017-08-15.
+   Validation WAPE: baseline (average of last 14 days) 21.81%, LightGBM 12.82%, LightGBM without weather 12.74% → about 41% better than baseline. Weather did NOT help (honest finding). Top features: lag_14 51%, mean_7 26%, mean_28 16%.
+   Note: the city "Libertad" geocoded to a place near Guayaquil, not the coastal town — no impact since weather isn't used.
+5. Test & understand results — NEXT
+   make_stage5.py creates src/features.py (shared feature code) and notebooks/04_evaluation.ipynb: final test on locked 14 days, error per category (saves reports/category_errors.csv), perishable vs long-life, low vs top sellers, Christmas 2016 back-test (12–25 Dec 2016, Extra 1), and trains the final model on all data → models/lgbm_final.txt + lgbm_final_info.json. Uses the no-weather feature set automatically if it had lower validation error.
+6. Reorder engine + Streamlit dashboard — TODO
+   - Forecast the 14 days after 2017-08-15 with models/lgbm_final.txt + src/features.py (build future rows; future onpromotion unknown → assume 0 and say so).
+   - order = forecast over window + safety buffer − current stock, minimum 0. Window: perishables 2–3 days, long-life 14 days. Buffer from each category's test WAPE (reports/category_errors.csv). Current stock is SIMULATED (dataset has none) and labelled so.
+   - conditions_rules.csv (written together with me): India condition → product groups, with a season column. Examples: Diwali → sweets, chocolates, gifts, toys, decor; Holi → colours, sweets; Raksha Bandhan → rakhis, sweets, gifts; Monsoon (Jun–Sep) / rainy → umbrellas, raincoats, quick-dry clothes, mosquito repellent, tea, snacks; Winter (Nov–Feb) → hoodies, sweatshirts, moisturiser; Summer (Mar–Jun) → cold drinks, ice cream, curd, ORS, sunscreen. These are rule-based assumptions, not model output — label them so.
+   - Indian festival dates: Python `holidays` library, holidays.country_holidays("IN", years=..., categories=("public", "optional")).
+   - Build all dashboard features listed under "End goal".
+7. Finish & present — TODO: deploy on Streamlit Community Cloud, README, report, slides, 2-minute demo.
+
+## Honest limits (keep in report)
+Ecuador data, not Indian; no stock data (stock simulated); category level, not item level; sales ≠ demand when out of stock; weather did not help at category level; India season/festival mapping is rule-based; future promotions assumed 0.

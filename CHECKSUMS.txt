@@ -1,0 +1,4 @@
+# SHA-256 checksums (verify with: shasum -a 256 -c CHECKSUMS.txt)
+2a4df48a86967c1df965d253035e67b0cf1ba54c4553795ffdd0fcb6a784c497  make_03_model.py
+bea06aee919b1a6555d4f33423b4f70cf31c6fea4c780f157d3a6e882e111aa6  notebooks/03_model.ipynb
+# PENDING: make_stage5.py, src/features.py, notebooks/04_evaluation.ipynb
