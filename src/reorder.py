@@ -3,7 +3,8 @@
 # Window: perishables 3 days, long-life 14 days.
 # Buffer = forecast over window x category test WAPE (reports/category_errors.csv), capped at 50%;
 #          categories selling < 1 unit/day per store get a fixed buffer of 1 unit.
-# Stock is SIMULATED (the dataset has no stock): random 3-10 days of the recent 14-day average, seed 42.
+# Stock is SIMULATED (the dataset has no stock): recent 14-day average x U(0.3, 1.5) x window_days, seed 42.
+# Status: "Urgent" if days_of_cover < 2, else "Reorder" if order_qty > 0, else "OK".
 # Run from the project root (after src/forecast.py): python3 src/reorder.py
 from pathlib import Path
 
@@ -26,8 +27,8 @@ def simulated_stock(pairs, last):
     avg = recent.groupby(["store_nbr", "family"])["sales"].mean().rename("recent_avg_14d").reset_index()
     out = pairs.merge(avg, on=["store_nbr", "family"], how="left").fillna({"recent_avg_14d": 0})
     rng = np.random.default_rng(SEED)
-    out["stock_days"] = rng.integers(3, 11, size=len(out))      # 3..10 days
-    out["stock_SIMULATED"] = np.round(out.recent_avg_14d * out.stock_days)
+    out["stock_factor"] = rng.uniform(0.3, 1.5, size=len(out))
+    out["stock_SIMULATED"] = np.round(out.recent_avg_14d * out.stock_factor * out.window_days)
     return out
 
 
@@ -50,9 +51,10 @@ def make_plan():
 
     plan = simulated_stock(plan, last)
     plan["order_qty"] = np.ceil((plan.forecast_window + plan.buffer - plan.stock_SIMULATED).clip(lower=0))
-    # No forecast demand -> days_of_cover left empty, status OK
-    plan["days_of_cover"] = (plan.stock_SIMULATED / plan.avg_daily_forecast).where(plan.avg_daily_forecast > 0)
-    plan["status"] = np.where(plan.days_of_cover < plan.window_days, "Reorder now", "OK")
+    # No forecast demand -> days_of_cover left empty (never Urgent)
+    # Rounded before the status, so the shown number and the status always agree
+    plan["days_of_cover"] = (plan.stock_SIMULATED / plan.avg_daily_forecast).where(plan.avg_daily_forecast > 0).round(1)
+    plan["status"] = np.select([plan.days_of_cover < 2, plan.order_qty > 0], ["Urgent", "Reorder"], "OK")
 
     cols = ["store_nbr", "family", "is_perishable", "window_days", "forecast_window", "buffer",
             "stock_SIMULATED", "order_qty", "days_of_cover", "status"]
@@ -66,8 +68,9 @@ if __name__ == "__main__":
     low = sorted(cat.loc[cat.avg_units_per_day < LOW_SELLER, "family"])
     print("Fixed 1-unit buffer (< 1 unit/day per store):", low)
     print("Buffer capped at 50%:", sorted(set(cat.loc[cat.WAPE_model > 50, "family"]) - set(low)))
-    print(f"\nRows: {len(plan):,} | Reorder now: {(plan.status == 'Reorder now').sum():,} | OK: {(plan.status == 'OK').sum():,}")
-    print(plan.groupby(["is_perishable", "status"]).size().rename("rows").to_string())
+    print(f"\nRows: {len(plan):,} |", " | ".join(f"{s}: {(plan.status == s).sum():,}" for s in ["Urgent", "Reorder", "OK"]))
+    counts = pd.crosstab(plan.is_perishable.map({0: "long-life", 1: "perishable"}), plan.status)
+    print(counts[[c for c in ["Urgent", "Reorder", "OK"] if c in counts]].to_string())
     print("\nTop 10 orders for store 44 (stock is SIMULATED):")
     print(plan[plan.store_nbr == 44].sort_values("order_qty", ascending=False).head(10).to_string(index=False))
     print("\nSaved:", REPORTS / "reorder_plan.csv")

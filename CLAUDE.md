@@ -65,16 +65,29 @@ Clean table columns: date, store_nbr, family, sales, onpromotion, is_closed, cit
    Saved: models/lgbm_final.txt + lgbm_final_info.json, reports/category_errors.csv, test_predictions.csv, q9–q11.
    For Stage 6: safety buffers from category WAPE must be capped/handled for tiny categories (e.g. BOOKS 420%) — agree the rule with me first.
    make_stage5.py creates src/features.py (shared feature code) and notebooks/04_evaluation.ipynb: final test on locked 14 days, error per category (saves reports/category_errors.csv), perishable vs long-life, low vs top sellers, Christmas 2016 back-test (12–25 Dec 2016, Extra 1), and trains the final model on all data → models/lgbm_final.txt + lgbm_final_info.json. Uses the no-weather feature set automatically if it had lower validation error.
-6. Reorder engine + Streamlit dashboard — IN PROGRESS
+6. Reorder engine + Streamlit dashboard — DONE
    6a Forecast engine — DONE: src/forecast.py (python3 src/forecast.py) → reports/forecast_next14.csv, 2017-08-16..2017-08-29, 24,206 rows (54 stores × 33 categories minus never_sold). Reuses src/features.py unchanged; holiday flags rebuilt with the 01_cleaning rules (verified identical on history); adds 60 calendar-only days so days_to_holiday sees the 9 Oct holiday (54 → 41).
       With planned promotions (decided in 6b): total forecast 11,130,075 units vs 11,444,795 in the last 14 days (−2.7%). (Earlier, with promotions = 0: 10,765,373, −5.9%.)
       Edge effect found: in the original features, days_to_holiday on 2017-08-12..15 was 60 (data ended) instead of 55–58; only those 4 days, tiny effect on lgbm_final.
    6b Bias check + reorder plan + India rules — DONE
-      Bias check (reports/test_predictions.csv): overall +4.88% (OVER-forecast), long-life +4.71%, perishable +5.24%. Agreed rule only covered −2..+2 (no change) and < −2 (correct), so NO bias_correction applied — waiting for my decision.
-      src/reorder.py → reports/reorder_plan.csv (1,729 rows). Window perishable 3 / long-life 14 days; buffer = forecast_window × test WAPE capped 50% (capped: HARDWARE, SCHOOL AND OFFICE SUPPLIES); fixed 1-unit buffer for < 1 unit/day per store (BABY CARE, BOOKS, HOME APPLIANCES); stock_SIMULATED = recent 14-day avg × random 3–10 days (seed 42); order_qty rounded up; status "Reorder now" if days_of_cover < window.
-      Result: 1,225 Reorder now / 504 OK. By design long-life is almost always Reorder now (1,212 of 1,243) and perishable almost always OK (473 of 486), because simulated stock is 3–10 days. Also: a row can be "OK" yet have order_qty > 0 (buffer pushes it over stock).
+      Bias check (reports/test_predictions.csv): overall +4.88% (OVER-forecast), long-life +4.71%, perishable +5.24%.
+      DECISION: NO bias correction. Test was +4.9% (over) but the Christmas back-test was −11% (under), so a single factor isn't reliable; slight over-forecast is the safer error for stock-outs.
+      DECISION: no new model features (e.g. days_since_holiday) — the test set has been seen, so changing the model now would leak test information.
+      src/reorder.py → reports/reorder_plan.csv (1,729 rows). Window perishable 3 / long-life 14 days; buffer = forecast_window × test WAPE capped 50% (capped: HARDWARE, SCHOOL AND OFFICE SUPPLIES); fixed 1-unit buffer for < 1 unit/day per store (BABY CARE, BOOKS, HOME APPLIANCES); order_qty rounded up.
+      stock_SIMULATED = recent 14-day avg daily sales × U(0.3, 1.5) × window_days, seed 42. days_of_cover = stock / avg daily forecast (rounded to 0.1 before the status, so shown number and status agree; empty if forecast is 0).
+      Status: "Urgent" if days_of_cover < 2, else "Reorder" if order_qty > 0, else "OK".
+      Result: Urgent 257 / Reorder 995 / OK 477 (long-life 111 / 843 / 289; perishable 146 / 152 / 188).
+      Quirk: tiny sellers whose simulated stock rounds to 0 (e.g. BOOKS, HOME APPLIANCES in store 44) show as Urgent with 0.0 days of cover.
       data_rules/conditions_rules.csv (my draft, rule-based assumptions) + data_rules/festival_name_map.csv (rule name → `holidays` library name, all 8 found; Karwa Chauth = "Karaka Chaturthi (Karwa Chouth)", Diwali = "Diwali (Deepavali)", Ganesh Chaturthi = "Ganesh Chaturthi / Vinayak Chaturthi"; Id-ul-Fitr 2027 is "(estimated)"). All related_categories match the 33 families. Library: holidays 0.107.
-   6c Streamlit app — NEXT
+   6c Streamlit dashboard — DONE: app/app.py (UI) + app/logic.py (all calculations, testable without Streamlit).
+      Run from the project root: streamlit run app/app.py. Theme in .streamlit/config.toml. requirements.txt pinned (Python 3.14.6 locally).
+      Reads ONLY app/data/ (1.2 MB, tracked in git; rebuilt by python3 src/build_app_data.py): history_last60.parquet (2017-06-17..2017-08-15), stores.csv, forecast_next14.csv, reorder_plan.csv, category_errors.csv, conditions_rules.csv, festival_name_map.csv, eval_summary.json. Never runs the model.
+      Pipeline order: python3 src/forecast.py → python3 src/reorder.py → python3 src/build_app_data.py.
+      Boosts: boosted_order = order + forecast_window × extra_stock_pct for active rules (festivals whose "start stocking by" date has arrived, the current season, rainy-day if the rain check found ≥ 5 mm). If several rules match a family, the largest % is used (no stacking). Season filter keeps only that season's rules.
+      Seasons from planning-date month: Summer Mar–May, Monsoon Jun–Sep (wins June), Winter Nov–Feb; October has no season rule.
+      Rain: Open-Meteo forecast API (precipitation_sum, 7 days, real today); friendly message if it fails.
+      Trending: last 7 days vs previous 28 days average units/day, open days only, categories under 1 unit/day skipped. Heatmap uses a log colour scale (hover = exact units).
+      Smoke test (2026-10-24): store 44 next 14 days 578,586 units (+1.5% vs last 14 days), 4 Urgent, 19 Reorder; 0 exceptions in AppTest runs and server log.
    DASHBOARD DATE DESIGN: the forecast/reorder side uses the data's "today" = 2017-08-15 (Ecuador demo). The India festival/season panel uses an "India planning date" picker (default = real today), clearly labelled as a separate, rule-based panel.
    - Forecast the 14 days after 2017-08-15 with models/lgbm_final.txt + src/features.py (build future rows; onpromotion = planned promotions from test.csv, 0 where no plan — say so).
    - order = forecast over window + safety buffer − current stock, minimum 0. Window: perishables 2–3 days, long-life 14 days. Buffer from each category's test WAPE (reports/category_errors.csv). Current stock is SIMULATED (dataset has none) and labelled so.
@@ -82,6 +95,17 @@ Clean table columns: date, store_nbr, family, sales, onpromotion, is_closed, cit
    - Indian festival dates: Python `holidays` library, holidays.country_holidays("IN", years=..., categories=("public", "optional")).
    - Build all dashboard features listed under "End goal".
 7. Finish & present — TODO: deploy on Streamlit Community Cloud, README, report, slides, 2-minute demo.
+
+## For the report
+- Test WAPE 15.51% vs baseline 21.98% (29.4% better) on the locked 14 days.
+- Valid→test gap (12.7% → 15.5%) mainly 12–13 Aug, the weekend after the 11 Aug (transferred) national holiday.
+- Perishable 12.0% vs long-life 17.2%; low sellers 52.2%, top sellers 15.1% → volume matters more than shelf life.
+- Christmas 2016 back-test: WAPE 20.1% vs 27.9% baseline; total units −11%; FROZEN FOODS rush only about half captured.
+- Christmas settings (140 trees, no weather) were chosen with July 2017 validation = small look-ahead (limitation).
+- No bias correction (test +4.9% over vs Christmas −11% under; over-forecast is the safer error for stock-outs).
+
+## Future work
+- days_since_holiday feature (would help the after-holiday weekend dip) — not added now because the test set has been seen.
 
 ## Honest limits (keep in report)
 Ecuador data, not Indian; no stock data (stock simulated); category level, not item level; sales ≠ demand when out of stock; weather did not help at category level; India season/festival mapping is rule-based; future promotions assumed 0.

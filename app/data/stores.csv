@@ -1,0 +1,55 @@
+store_nbr,city,state,store_type
+1,Quito,Pichincha,D
+2,Quito,Pichincha,D
+3,Quito,Pichincha,D
+4,Quito,Pichincha,D
+5,Santo Domingo,Santo Domingo de los Tsachilas,D
+6,Quito,Pichincha,D
+7,Quito,Pichincha,D
+8,Quito,Pichincha,D
+9,Quito,Pichincha,B
+10,Quito,Pichincha,C
+11,Cayambe,Pichincha,B
+12,Latacunga,Cotopaxi,C
+13,Latacunga,Cotopaxi,C
+14,Riobamba,Chimborazo,C
+15,Ibarra,Imbabura,C
+16,Santo Domingo,Santo Domingo de los Tsachilas,C
+17,Quito,Pichincha,C
+18,Quito,Pichincha,B
+19,Guaranda,Bolivar,C
+20,Quito,Pichincha,B
+21,Santo Domingo,Santo Domingo de los Tsachilas,B
+22,Puyo,Pastaza,C
+23,Ambato,Tungurahua,D
+24,Guayaquil,Guayas,D
+25,Salinas,Santa Elena,D
+26,Guayaquil,Guayas,D
+27,Daule,Guayas,D
+28,Guayaquil,Guayas,E
+29,Guayaquil,Guayas,E
+30,Guayaquil,Guayas,C
+31,Babahoyo,Los Rios,B
+32,Guayaquil,Guayas,C
+33,Quevedo,Los Rios,C
+34,Guayaquil,Guayas,B
+35,Playas,Guayas,C
+36,Libertad,Guayas,E
+37,Cuenca,Azuay,D
+38,Loja,Loja,D
+39,Cuenca,Azuay,B
+40,Machala,El Oro,C
+41,Machala,El Oro,D
+42,Cuenca,Azuay,D
+43,Esmeraldas,Esmeraldas,E
+44,Quito,Pichincha,A
+45,Quito,Pichincha,A
+46,Quito,Pichincha,A
+47,Quito,Pichincha,A
+48,Quito,Pichincha,A
+49,Quito,Pichincha,A
+50,Ambato,Tungurahua,A
+51,Guayaquil,Guayas,A
+52,Manta,Manabi,A
+53,Manta,Manabi,D
+54,El Carmen,Manabi,C
