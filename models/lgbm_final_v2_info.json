@@ -1,0 +1,53 @@
+{
+  "variant": "v2",
+  "features": [
+    "store_id",
+    "family",
+    "city",
+    "store_type",
+    "cluster",
+    "is_perishable",
+    "dayofweek",
+    "day",
+    "month",
+    "weekofyear",
+    "dayofyear",
+    "is_payday",
+    "is_holiday",
+    "is_national_holiday",
+    "is_regional_holiday",
+    "is_local_holiday",
+    "is_event",
+    "is_quake",
+    "days_to_holiday",
+    "onpromotion",
+    "lag_14",
+    "lag_21",
+    "lag_28",
+    "lag_35",
+    "lag_42",
+    "mean_7",
+    "mean_28",
+    "mean_56",
+    "std_28",
+    "trans_lag14",
+    "oil_lag14",
+    "days_since_holiday",
+    "sales_lag_364"
+  ],
+  "objective": "tweedie",
+  "tweedie_variance_power": 1.2,
+  "n_trees": 140,
+  "trained_from": "2015-01-01",
+  "trained_until": "2017-08-15",
+  "quantile_models": {
+    "forecast_low": {
+      "file": "lgbm_q10.txt",
+      "alpha": 0.1
+    },
+    "forecast_high": {
+      "file": "lgbm_q90.txt",
+      "alpha": 0.9
+    }
+  }
+}

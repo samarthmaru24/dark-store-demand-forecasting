@@ -1,6 +1,8 @@
-# Dark Store Demand Planner — Streamlit dashboard (Stage 6c).
-# Reads only precomputed files in app/data/ (src/build_app_data.py). The model never runs here.
-# Run from the project root: streamlit run app/app.py
+"""Dark Store Demand Planner — Streamlit dashboard.
+
+Reads only precomputed files in app/data/ (src/build_app_data.py). The model never runs here.
+Run from the project root: streamlit run app/app.py
+"""
 import datetime as dt
 
 import numpy as np
@@ -33,6 +35,12 @@ def weather(city):
 @st.cache_data
 def festivals(planning_date):
     return L.india_festivals(data(), planning_date)
+
+
+@st.cache_data
+def per_store(fn, store, fams):
+    # Cached per-store calculations (fams as a tuple so it can be a cache key): switching back is instant
+    return getattr(L, fn)(data(), store, list(fams))
 
 
 def style(fig, height=360, ytitle="units"):
@@ -82,29 +90,33 @@ st.title("Dark Store Demand Planner")
 st.caption(f"{labels[store]} · forecast for 2017-08-16 to 2017-08-29 · data “today” = 2017-08-15 · "
            f"{len(fams)} of 33 categories · all quantities in units")
 
-k = L.kpis(d, store, fams)
-ev = d["eval"]
+k = per_store("kpis", store, tuple(fams))
+res = d["results"]
+bt, test = res["backtest_6_windows"], res["test_2017-08-02_to_2017-08-15"]
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Next 14 days forecast", f"{k['forecast_14d']:,.0f} units",
           f"{k['change_pct']:+.1f}% vs last 14 days", delta_color="off")
 c2.metric("Urgent items", k["urgent"], help="Days of cover below 2 (stock is SIMULATED).")
 c3.metric("Items to reorder", k["reorder"], help="Order quantity above 0, not urgent.")
-c4.metric("Model error on unseen days", f"{ev['test_WAPE']:.1f}%",
-          help=f"WAPE on the locked test days {ev['test_period']}. Lower is better.")
-c4.caption(f"vs {ev['baseline_test_WAPE']:.1f}% for a simple 14-day average")
+c4.metric("Model error (back-tests)", f"{bt['chosen_v2']['mean']:.1f}%",
+          help=f"Average WAPE over 6 back-test windows of 14 days (lower is better). Locked test days "
+               f"2017-08-02 to 2017-08-15: v1 {test['v1']['WAPE']:.1f}% (first, unseen score), "
+               f"v2 {test['v2']['WAPE']:.1f}% (scored after the test was seen), "
+               f"baseline {test['baseline']['WAPE']:.1f}%.")
+c4.caption(f"vs {bt['chosen_v2']['baseline_mean']:.1f}% for a simple 14-day average")
 
 # ---------------- Demand chart ----------------
 st.subheader("Demand: last 30 days and next 14 days")
-series, by_cat = L.demand_series(d, store, fams)
+series, by_cat = per_store("demand_series", store, tuple(fams))
 fig = go.Figure()
 for i, (name, g) in enumerate(series.groupby("series", sort=False)):
     col = SERIES[i % len(SERIES)] if by_cat else SERIES[0]
     a, f = g[g.kind == "actual"], g[g.kind == "forecast"]
-    fig.add_trace(go.Scatter(x=f.date, y=f.high, mode="lines", line=dict(width=0), showlegend=False,
-                             hoverinfo="skip"))
-    fig.add_trace(go.Scatter(x=f.date, y=f.low, mode="lines", line=dict(width=0), fill="tonexty",
-                             fillcolor=rgba(col, 0.15), hoverinfo="skip",
-                             name=f"{name} — approximate range" if by_cat else "Approximate range"))
+    if by_cat:
+        fig.add_trace(go.Scatter(x=f.date, y=f.high, mode="lines", line=dict(width=0), showlegend=False,
+                                 hoverinfo="skip"))
+        fig.add_trace(go.Scatter(x=f.date, y=f.low, mode="lines", line=dict(width=0), fill="tonexty",
+                                 fillcolor=rgba(col, 0.15), hoverinfo="skip", name=f"{name} — 80% range"))
     fig.add_trace(go.Scatter(x=a.date, y=a.units, mode="lines", name=f"{name} — actual" if by_cat else "Actual",
                              line=dict(color=col, width=2), hovertemplate="%{y:,.0f} units"))
     fig.add_trace(go.Scatter(x=f.date, y=f.units, mode="lines", name=f"{name} — forecast" if by_cat else "Forecast",
@@ -114,14 +126,16 @@ fig.add_shape(type="line", x0=L.TODAY_DATA, x1=L.TODAY_DATA, y0=0, y1=1, yref="p
 fig.add_annotation(x=L.TODAY_DATA, y=1, yref="paper", text="today (2017-08-15)", showarrow=False,
                    xanchor="left", yanchor="bottom", font=dict(color=INK2, size=12))
 st.plotly_chart(style(fig, 400), width="stretch")
-st.caption("Solid = actual units sold, dashed = forecast. Shaded band = forecast ± each category's test error "
-           "(approximate range, not a guarantee). "
-           + ("One line per category." if by_cat else "Pick 4 or fewer categories to see one line each."))
+st.caption("Solid = actual units sold, dashed = forecast. "
+           + (f"Shaded band = 80% range from the 10% and 90% quantile models (covered "
+              f"{bt['range_coverage_pct']['mean']:.0f}% of actual values in back-tests)." if by_cat else
+              "Pick 4 or fewer categories to see one line each with its 80% range "
+              "(ranges of single categories can't simply be added up for a total)."))
 
 # ---------------- Trending + heatmap ----------------
 with st.container():
     st.subheader("Trending now")
-    up, down = L.trending(d, store, fams)
+    up, down = per_store("trending", store, tuple(fams))
     t = pd.concat([down, up]).sort_values("change_pct")
     if t.empty:
         st.info("Not enough sales history for the selected categories.")
@@ -143,7 +157,7 @@ with st.container():
 
 with st.container():
     st.subheader("Next 14 days by category")
-    hm = L.heatmap_table(d, store, fams)
+    hm = per_store("heatmap_table", store, tuple(fams))
     hm = hm.loc[hm.sum(axis=1).sort_values().index]
     # Log colour scale: a few big categories would otherwise make all others look the same
     ticks = [t for t in [1, 10, 100, 1_000, 10_000, 100_000] if t <= max(hm.values.max(), 1) * 10]
@@ -191,7 +205,9 @@ num = {c: "{:,.0f}" for c in ["Forecast over window", "Buffer", "Stock (SIMULATE
 styled = table.style.format({**num, "Days of cover": "{:.1f}"}, na_rep="—").map(status_css, subset=["Status"])
 st.dataframe(styled, hide_index=True, width="stretch", height=min(38 * len(table) + 40, 560))
 st.caption("Order = forecast over window + safety buffer − stock, minimum 0. Window: perishables 3 days, "
-           "long-life 14 days. Urgent = under 2 days of cover · Reorder = order above 0 · OK = enough stock. "
+           "long-life 14 days. Buffer = gap between the 90% range and the forecast (max 50% of the forecast). "
+           "Urgent = under 2 days of cover (only items selling at least 1 unit/day) · Reorder = order above 0 · "
+           "OK = enough stock. "
            "**Stock is SIMULATED** (the dataset has no stock data).")
 if boost_on:
     st.caption(f"Boosts use the India planning date {planning_date}, season filter “{season_filter}”"
@@ -281,13 +297,14 @@ else:
 # ---------------- Perishable vs long-life ----------------
 st.divider()
 st.subheader("Perishable vs long-life")
-sl = L.shelf_life_split(d, store, fams)
+sl = per_store("shelf_life_split", store, tuple(fams))
 cols = st.columns(2)
 for col, r in zip(cols, sl.itertuples()):
     col.metric(f"{r.group}: share of next-14-day units", f"{r.share_pct:.1f}%")
-    col.caption(f"{r.forecast_units:,.0f} units · test error (all stores): **{r.test_WAPE:.1f}%** WAPE")
+    col.caption(f"{r.forecast_units:,.0f} units · back-test error (all stores): **{r.backtest_WAPE:.1f}%** WAPE")
 st.caption("Perishables are easier to predict here mainly because they sell in high volume every day; "
-           "low sellers are the hardest (52% error) whatever their shelf life.")
+           f"low sellers are the hardest ({test['v2']['volume']['low sellers']:.0f}% error on the test days) "
+           "whatever their shelf life.")
 
 # ---------------- About ----------------
 with st.expander("About & limits"):
@@ -299,6 +316,17 @@ with st.expander("About & limits"):
 - **Weather did not help** the model at category level, so it is not used.
 - **India rules are assumptions** (festival and season products, extra stock %, lead days), not model output.
 - **Planned promotions** for the forecast days come from the dataset's test.csv (a store knows its promotion calendar).
-- Model: LightGBM, 31 features, every past-sales clue at least 14 days old. Test error 15.5% vs 22.0% for a simple
-  14-day average, on 14 days the model never saw.
 """)
+    st.markdown(
+        f"- **Model (v2):** LightGBM, 33 features (incl. days since holiday, same weekday last year), Tweedie "
+        f"objective; every past-sales clue is at least 14 days old. Chosen on 6 back-test windows only: "
+        f"{bt['chosen_v2']['mean']:.1f}% error vs {bt['experiment_mean']['v1']['WAPE']:.1f}% for v1 and "
+        f"{bt['chosen_v2']['baseline_mean']:.1f}% for the baseline.\n"
+        f"- **Locked test days (2017-08-02 to 2017-08-15):** v1 {test['v1']['WAPE']:.1f}% was the first, unseen "
+        f"score; v2 {test['v2']['WAPE']:.1f}% was measured after the test had been seen; baseline "
+        f"{test['baseline']['WAPE']:.1f}%.")
+
+st.divider()
+st.caption("Data: [Store Sales – Time Series Forecasting](https://www.kaggle.com/competitions/store-sales-time-series-forecasting) "
+           "(Corporación Favorita, via Kaggle) · Festival dates: Python `holidays` library · "
+           "[Weather data by Open-Meteo.com](https://open-meteo.com/) (CC BY 4.0) · All quantities in units.")

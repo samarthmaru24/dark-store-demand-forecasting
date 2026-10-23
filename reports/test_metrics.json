@@ -1,0 +1,32 @@
+{
+  "note": "Test period 2017-08-02..2017-08-15 was first used in Stage 5 (v1); v2 was chosen on back-tests only and is scored here afterwards, so v2's test number is not a fresh unseen score.",
+  "baseline": {
+    "WAPE": 21.977175084237015,
+    "WAPE_perishable": 20.414933203780766,
+    "WAPE_long_life": 22.742608890745654,
+    "bias_pct": 4.781887381228178
+  },
+  "v1": {
+    "WAPE": 15.51065831877589,
+    "WAPE_perishable": 12.023530612887953,
+    "WAPE_long_life": 17.219206442527383,
+    "bias_pct": 4.882164940475131,
+    "volume": {
+      "low sellers": 52.166689298951226,
+      "medium sellers": 24.509743777250037,
+      "top sellers": 15.052577301108524
+    }
+  },
+  "v2": {
+    "WAPE": 13.658503475165762,
+    "WAPE_perishable": 10.619760456864043,
+    "WAPE_long_life": 15.147361676061605,
+    "bias_pct": 4.723828881364156,
+    "volume": {
+      "low sellers": 57.30802876221498,
+      "medium sellers": 24.69250711604545,
+      "top sellers": 13.099950303536446
+    },
+    "range_coverage_pct": 83.64455093778402
+  }
+}

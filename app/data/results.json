@@ -1,0 +1,149 @@
+{
+  "chosen_model": "v2",
+  "model_versions": {
+    "v1": "LightGBM, 31 features, log1p(sales), 140 trees (Stage 5)",
+    "v2": "v1 + days_since_holiday + sales_lag_364, Tweedie objective (variance_power 1.2) on raw sales"
+  },
+  "validation_2017-07-19_to_2017-08-01": {
+    "Baseline (14-day average)": 21.81,
+    "LightGBM (all features)": 12.82,
+    "LightGBM (no weather)": 12.74
+  },
+  "test_2017-08-02_to_2017-08-15": {
+    "note": "Test period 2017-08-02..2017-08-15 was first used in Stage 5 (v1); v2 was chosen on back-tests only and is scored here afterwards, so v2's test number is not a fresh unseen score.",
+    "baseline": {
+      "WAPE": 21.98,
+      "WAPE_perishable": 20.41,
+      "WAPE_long_life": 22.74,
+      "bias_pct": 4.78
+    },
+    "v1": {
+      "WAPE": 15.51,
+      "WAPE_perishable": 12.02,
+      "WAPE_long_life": 17.22,
+      "bias_pct": 4.88,
+      "volume": {
+        "low sellers": 52.2,
+        "medium sellers": 24.5,
+        "top sellers": 15.1
+      }
+    },
+    "v2": {
+      "WAPE": 13.66,
+      "WAPE_perishable": 10.62,
+      "WAPE_long_life": 15.15,
+      "bias_pct": 4.72,
+      "volume": {
+        "low sellers": 57.3,
+        "medium sellers": 24.7,
+        "top sellers": 13.1
+      },
+      "range_coverage_pct": 83.6
+    },
+    "v1_improvement_vs_baseline_pct": 29.4,
+    "v2_improvement_vs_baseline_pct": 37.9
+  },
+  "backtest_6_windows": {
+    "windows": [
+      "2017-01-16",
+      "2017-02-27",
+      "2017-04-10",
+      "2017-05-22",
+      "2017-06-19",
+      "2017-07-19"
+    ],
+    "experiment_mean": {
+      "baseline": {
+        "WAPE": 25.31,
+        "WAPE_perishable": 23.67,
+        "WAPE_long_life": 26.14,
+        "bias_pct": 0.96
+      },
+      "v1": {
+        "WAPE": 15.32,
+        "WAPE_perishable": 14.72,
+        "WAPE_long_life": 15.58,
+        "bias_pct": -4.17
+      },
+      "v1+A4": {
+        "WAPE": 14.7,
+        "WAPE_perishable": 13.52,
+        "WAPE_long_life": 15.26,
+        "bias_pct": -3.97
+      },
+      "v1+A4+Tweedie": {
+        "WAPE": 13.72,
+        "WAPE_perishable": 12.05,
+        "WAPE_long_life": 14.54,
+        "bias_pct": -1.96
+      }
+    },
+    "chosen_v2": {
+      "mean": 13.72,
+      "min": 10.63,
+      "max": 17.59,
+      "baseline_mean": 25.31
+    },
+    "range_coverage_pct": {
+      "target": 80,
+      "mean": 82.8,
+      "min": 81.6,
+      "max": 84.4,
+      "perishable": 81.2,
+      "long_life": 83.5
+    }
+  },
+  "christmas_backtest": {
+    "window": "2016-12-12 to 2016-12-24",
+    "WAPE_baseline": 27.9,
+    "v1": {
+      "WAPE": 20.1,
+      "units_vs_actual_pct": -11.0
+    },
+    "v2": {
+      "WAPE": 17.8,
+      "units_vs_actual_pct": -2.2
+    },
+    "units_actual": 13374630,
+    "categories": {
+      "BEVERAGES": {
+        "actual": 2539038,
+        "v1": 2542874,
+        "v2": 2683899,
+        "baseline": 2561565
+      },
+      "FROZEN FOODS": {
+        "actual": 795112,
+        "v1": 445398,
+        "v2": 750276,
+        "baseline": 162713
+      },
+      "GROCERY I": {
+        "actual": 4480027,
+        "v1": 3478679,
+        "v2": 3892830,
+        "baseline": 3645597
+      },
+      "LIQUOR,WINE,BEER": {
+        "actual": 139570,
+        "v1": 143888,
+        "v2": 167045,
+        "baseline": 83952
+      }
+    }
+  },
+  "forecast_2017-08-16_to_2017-08-29": {
+    "model": "v2",
+    "total_units": 11236282,
+    "last_14_days_actual_units": 11444795,
+    "change_vs_last_14_days_pct": -1.8,
+    "perishable_share_pct": 33.5
+  },
+  "reorder_plan": {
+    "rows": 1729,
+    "Urgent": 206,
+    "Reorder": 1237,
+    "OK": 286,
+    "stock": "SIMULATED"
+  }
+}

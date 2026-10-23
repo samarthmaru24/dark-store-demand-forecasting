@@ -26,12 +26,14 @@ Folder: ~/DSML-Project
 - raw/weather_ecuador/   weather.csv (date, city, rain_mm, temp_max), 37,136 rows, Open-Meteo, 22 cities — the ONE code-generated file allowed in raw/ (written by 03_model when missing; external API download = raw data)
 - raw/national_holiday/, raw/extra/ (m5, favorita full, Diwali datasets, archive) — NOT used for training
 - clean/store_sales_clean.parquet — cleaned table, 2,785,464 rows × 21 columns
-- notebooks/ 01_cleaning, 02_eda, 03_model (+ 03_model_run = executed copy)
-- models/ lgbm_v1.txt, lgbm_v1_info.json
-- reports/ charts q1–q6 and q8 (no q7), festival_effect.csv
-- src/, app/ — empty so far (except .gitkeep)
-- make_03_model.py (generator for 03_model.ipynb), make_stage5.py (generator for Stage 5, not yet run)
-- CHECKSUMS.txt — SHA-256 of every generator script and the files it creates
+- notebooks/ 01_cleaning, 02_eda, 03_model, 04_evaluation (+ *_run = executed copies)
+- models/ lgbm_v1 (Stage 4), lgbm_final (v1, Stage 5), lgbm_final_v2 (v2, current), lgbm_q10 / lgbm_q90 (80% range); *_info.json
+- reports/ charts q1–q6, q8–q12 (no q7), results.json (SINGLE SOURCE OF TRUTH for every number), test_metrics.json, backtest*.csv, christmas_backtest.json, forecast_next14.parquet, reorder_plan.parquet (+ .csv copies for download), test_predictions.csv (v1) / _v2.csv, category_errors.csv, festival_effect.csv
+- src/ features.py (v1 build_features unchanged + v2 add-on), model.py (settings, CHOSEN = "v2"), train.py, backtest.py, forecast.py, reorder.py, results.py, build_app_data.py — each has a module docstring
+- app/ app.py + logic.py + data/ (0.7 MB); data_rules/ India rules; tests/test_pipeline.py (pytest, 10 checks)
+- run_all.py: [--retrain → train] → forecast → reorder → backtest → results.json → app data
+- make_03_model.py (generator for 03_model.ipynb), make_stage5.py (generator for Stage 5; ran once)
+- CHECKSUMS.txt — SHA-256 of generator scripts, generated files and pipeline code. src/features.py was extended after generation (v2 add-on); tests/test_pipeline.py checks that the generated v1 build_features code is still in it unchanged.
 - .gitignore excludes raw/ and clean/ (data never goes to GitHub). Local git repo initialised here; GitHub remote is connected in Stage 7.
 Clean table columns: date, store_nbr, family, sales, onpromotion, is_closed, city, state, store_type, cluster, is_event, is_national_holiday, is_regional_holiday, is_local_holiday, is_holiday, dcoilwtico, transactions, is_payday, is_quake, is_perishable, never_sold.
 "sales" = UNITS sold (not money). Never write $, ₹ or "revenue".
@@ -39,7 +41,7 @@ Clean table columns: date, store_nbr, family, sales, onpromotion, is_closed, cit
 ## HARD RULES (always)
 1. Never modify, move or delete anything in raw/. Only exception: raw/weather_ecuador/weather.csv may be (re)downloaded by code. No other code may write to raw/.
 2. The 14-day rule: any past sales / oil / transactions feature must be at least 14 days old. No same-day oil or transactions. Split by time, never shuffle.
-3. Test period 2017-08-02 to 2017-08-15 is locked — used only in Stage 5, once.
+3. Test period 2017-08-02 to 2017-08-15 is locked — used first in Stage 5 (v1). Model changes are accepted or rejected ONLY on back-test windows; after a change, report test WAPE for v1 and v2 side by side and say the test was already seen.
 4. Report only numbers actually printed by code.
 5. Never silently change agreed logic or rewrite a pre-written notebook. If a change is needed: explain what and why, smallest fix, and wait for my OK.
 6. Pre-written files come from generator scripts with SHA-256 checksums; always verify the checksum before running.
@@ -66,14 +68,14 @@ Clean table columns: date, store_nbr, family, sales, onpromotion, is_closed, cit
    For Stage 6: safety buffers from category WAPE must be capped/handled for tiny categories (e.g. BOOKS 420%) — agree the rule with me first.
    make_stage5.py creates src/features.py (shared feature code) and notebooks/04_evaluation.ipynb: final test on locked 14 days, error per category (saves reports/category_errors.csv), perishable vs long-life, low vs top sellers, Christmas 2016 back-test (12–25 Dec 2016, Extra 1), and trains the final model on all data → models/lgbm_final.txt + lgbm_final_info.json. Uses the no-weather feature set automatically if it had lower validation error.
 6. Reorder engine + Streamlit dashboard — DONE
-   6a Forecast engine — DONE: src/forecast.py (python3 src/forecast.py) → reports/forecast_next14.csv, 2017-08-16..2017-08-29, 24,206 rows (54 stores × 33 categories minus never_sold). Reuses src/features.py unchanged; holiday flags rebuilt with the 01_cleaning rules (verified identical on history); adds 60 calendar-only days so days_to_holiday sees the 9 Oct holiday (54 → 41).
+   6a Forecast engine — DONE: src/forecast.py (python3 src/forecast.py) → reports/forecast_next14.csv (now .parquet + .csv copy, v2 model — see 6d), 2017-08-16..2017-08-29, 24,206 rows (54 stores × 33 categories minus never_sold). Reuses src/features.py unchanged; holiday flags rebuilt with the 01_cleaning rules (verified identical on history); adds 60 calendar-only days so days_to_holiday sees the 9 Oct holiday (54 → 41).
       With planned promotions (decided in 6b): total forecast 11,130,075 units vs 11,444,795 in the last 14 days (−2.7%). (Earlier, with promotions = 0: 10,765,373, −5.9%.)
       Edge effect found: in the original features, days_to_holiday on 2017-08-12..15 was 60 (data ended) instead of 55–58; only those 4 days, tiny effect on lgbm_final.
    6b Bias check + reorder plan + India rules — DONE
       Bias check (reports/test_predictions.csv): overall +4.88% (OVER-forecast), long-life +4.71%, perishable +5.24%.
       DECISION: NO bias correction. Test was +4.9% (over) but the Christmas back-test was −11% (under), so a single factor isn't reliable; slight over-forecast is the safer error for stock-outs.
       DECISION: no new model features (e.g. days_since_holiday) — the test set has been seen, so changing the model now would leak test information.
-      src/reorder.py → reports/reorder_plan.csv (1,729 rows). Window perishable 3 / long-life 14 days; buffer = forecast_window × test WAPE capped 50% (capped: HARDWARE, SCHOOL AND OFFICE SUPPLIES); fixed 1-unit buffer for < 1 unit/day per store (BABY CARE, BOOKS, HOME APPLIANCES); order_qty rounded up.
+      src/reorder.py → reports/reorder_plan.csv (1,729 rows; Stage 6b version — buffer and Urgent rule replaced in 6d). Window perishable 3 / long-life 14 days; buffer = forecast_window × test WAPE capped 50% (capped: HARDWARE, SCHOOL AND OFFICE SUPPLIES); fixed 1-unit buffer for < 1 unit/day per store (BABY CARE, BOOKS, HOME APPLIANCES); order_qty rounded up.
       stock_SIMULATED = recent 14-day avg daily sales × U(0.3, 1.5) × window_days, seed 42. days_of_cover = stock / avg daily forecast (rounded to 0.1 before the status, so shown number and status agree; empty if forecast is 0).
       Status: "Urgent" if days_of_cover < 2, else "Reorder" if order_qty > 0, else "OK".
       Result: Urgent 257 / Reorder 995 / OK 477 (long-life 111 / 843 / 289; perishable 146 / 152 / 188).
@@ -81,7 +83,7 @@ Clean table columns: date, store_nbr, family, sales, onpromotion, is_closed, cit
       data_rules/conditions_rules.csv (my draft, rule-based assumptions) + data_rules/festival_name_map.csv (rule name → `holidays` library name, all 8 found; Karwa Chauth = "Karaka Chaturthi (Karwa Chouth)", Diwali = "Diwali (Deepavali)", Ganesh Chaturthi = "Ganesh Chaturthi / Vinayak Chaturthi"; Id-ul-Fitr 2027 is "(estimated)"). All related_categories match the 33 families. Library: holidays 0.107.
    6c Streamlit dashboard — DONE: app/app.py (UI) + app/logic.py (all calculations, testable without Streamlit).
       Run from the project root: streamlit run app/app.py. Theme in .streamlit/config.toml. requirements.txt pinned (Python 3.14.6 locally).
-      Reads ONLY app/data/ (1.2 MB, tracked in git; rebuilt by python3 src/build_app_data.py): history_last60.parquet (2017-06-17..2017-08-15), stores.csv, forecast_next14.csv, reorder_plan.csv, category_errors.csv, conditions_rules.csv, festival_name_map.csv, eval_summary.json. Never runs the model.
+      Reads ONLY app/data/ (0.7 MB, tracked in git; rebuilt by python3 src/build_app_data.py): history_last60.parquet (2017-06-17..2017-08-15), stores.csv, forecast_next14.parquet, reorder_plan.parquet, category_errors.csv, conditions_rules.csv, festival_name_map.csv, results.json. Never runs the model.
       Pipeline order: python3 src/forecast.py → python3 src/reorder.py → python3 src/build_app_data.py.
       Boosts: boosted_order = order + forecast_window × extra_stock_pct for active rules (festivals whose "start stocking by" date has arrived, the current season, rainy-day if the rain check found ≥ 5 mm). If several rules match a family, the largest % is used (no stacking). Season filter keeps only that season's rules.
       Seasons from planning-date month: Summer Mar–May, Monsoon Jun–Sep (wins June), Winter Nov–Feb; October has no season rule.
@@ -91,15 +93,31 @@ Clean table columns: date, store_nbr, family, sales, onpromotion, is_closed, cit
       Trending: last 7 days vs previous 28 days average units/day, open days only, categories under 1 unit/day skipped. Heatmap uses a log colour scale (hover = exact units).
       Smoke test (2026-10-24): store 44 next 14 days 578,586 units (+1.5% vs last 14 days), 4 Urgent, 19 Reorder; 0 exceptions in AppTest runs and server log.
    DASHBOARD DATE DESIGN: the forecast/reorder side uses the data's "today" = 2017-08-15 (Ecuador demo). The India festival/season panel uses an "India planning date" picker (default = real today), clearly labelled as a separate, rule-based panel.
-   - Forecast the 14 days after 2017-08-15 with models/lgbm_final.txt + src/features.py (build future rows; onpromotion = planned promotions from test.csv, 0 where no plan — say so).
-   - order = forecast over window + safety buffer − current stock, minimum 0. Window: perishables 2–3 days, long-life 14 days. Buffer from each category's test WAPE (reports/category_errors.csv). Current stock is SIMULATED (dataset has none) and labelled so.
-   - conditions_rules.csv (written together with me): India condition → product groups, with a season column. Examples: Diwali → sweets, chocolates, gifts, toys, decor; Holi → colours, sweets; Raksha Bandhan → rakhis, sweets, gifts; Monsoon (Jun–Sep) / rainy → umbrellas, raincoats, quick-dry clothes, mosquito repellent, tea, snacks; Winter (Nov–Feb) → hoodies, sweatshirts, moisturiser; Summer (Mar–Jun) → cold drinks, ice cream, curd, ORS, sunscreen. These are rule-based assumptions, not model output — label them so.
+   - conditions_rules.csv: India condition → product groups, with a season column. Rule-based assumptions, not model output — label them so.
    - Indian festival dates: Python `holidays` library, holidays.country_holidays("IN", years=..., categories=("public", "optional")).
-   - Build all dashboard features listed under "End goal".
+   6d Fine-tuning — DONE (CURRENT STATE; supersedes the older 6a/6b model, buffer, status and file details above)
+      A1 Back-tests (src/backtest.py): 6 windows of 14 days starting 2017-01-16, 02-27, 04-10, 05-22, 06-19, 07-19; train 2015-01-01 → window start; mean = simple average of window WAPEs.
+      A3+A4 experiment (python3 src/backtest.py --experiment, same 140 trees for all): mean WAPE baseline 25.31 | v1 15.32 | v1+A4 14.70 | v1+A4+Tweedie 13.72; perishable 23.67 | 14.72 | 13.52 | 12.05; bias +0.96 | −4.17 | −3.97 | −1.96%.
+      DECISION: keep v1+A4+Tweedie = v2 (1.60 points better ≥ 0.3, perishable better). Better in 5 of 6 windows; worse on 2017-04-10 (17.59 vs 15.63).
+      v2 = v1 + days_since_holiday (cap 60) + sales_lag_364, objective tweedie (variance_power 1.2) on raw sales. v1 still reproducible (model.variant("v1")).
+      Test days (ALREADY SEEN, v2 scored afterwards): baseline 21.98 | v1 15.51 | v2 13.66 (perishable 10.6, long-life 15.1; low sellers 57.3 (v1 52.2) — worse, top sellers 13.1 (v1 15.1)).
+      Christmas back-test: v1 20.1% (−11.0% units, reproduces Stage 5 exactly) | v2 17.8% (−2.2% units; FROZEN FOODS 750,276 vs actual 795,112).
+      A7 Ranges: quantile LightGBM (alpha 0.1 / 0.9, log1p target, v2 features). Back-test coverage mean 82.8% (81.6–84.4; perishable 81.2, long-life 83.5), test 83.6%. Forecast range clipped to include the point forecast in 155 of 24,206 rows (0.6%). Row ranges can't be summed into a total range → the app shows bands only per category.
+      Reorder (current): buffer = Σ over window max(forecast_high − forecast, 0), capped at 50% of forecast_window (624 rows capped), ≥ 1 unit for tiny categories (BABY CARE, BOOKS, HOME APPLIANCES). B3: Urgent only if avg daily forecast ≥ 1. Result: Urgent 206 / Reorder 1,237 / OK 286.
+      Forecast (v2, 2017-08-16..29): 11,236,282 units vs 11,444,795 last 14 days (−1.8%).
+      B5 tests: 10 passed (lag_14 / sales_lag_364 / trans / oil age, no same-day inputs, v1 code unchanged, splits, outputs, hand-made reorder example, festival dates, rule categories). A mutated lag test fails as expected.
+      B6 Python: Streamlit Cloud supports released Python versions still receiving security updates; pick it in "Advanced settings" (runtime.txt is ignored). Tested on 3.14 (local) and a fresh 3.12 venv from requirements.txt: 10 tests passed, app 0 exceptions.
+      Reproducibility: python3 run_all.py --retrain reproduces results.json and the reorder plan identically.
+      App: band = 80% range (≤ 4 categories), KPI = back-test error 13.7% vs 25.3% (test v1/v2 in the help text), per-store cached calculations, footer credits (Kaggle/Favorita, holidays, Open-Meteo CC BY 4.0).
 7. Finish & present — TODO: deploy on Streamlit Community Cloud, README, report, slides, 2-minute demo.
 
 ## For the report
-- Test WAPE 15.51% vs baseline 21.98% (29.4% better) on the locked 14 days.
+(all numbers: reports/results.json)
+- Headline unseen score: v1 test WAPE 15.51% vs baseline 21.98% (29.4% better) on the locked 14 days.
+- Fine-tuning judged on 6 back-test windows only: v2 13.72% vs v1 15.32% vs baseline 25.31%. v2 test 13.66% was measured after the test had been seen (37.9% better than baseline) — say so.
+- v2 is better for top sellers (13.1 vs 15.1) but worse for low sellers (57.3 vs 52.2).
+- Christmas back-test v2 17.8% (units −2.2%) vs v1 20.1% (−11%): same-day-last-year helps festival rushes.
+- 80% prediction ranges cover 82.8% of actual values in back-tests (slightly wide).
 - Valid→test gap (12.7% → 15.5%) mainly 12–13 Aug, the weekend after the 11 Aug (transferred) national holiday.
 - Perishable 12.0% vs long-life 17.2%; low sellers 52.2%, top sellers 15.1% → volume matters more than shelf life.
 - Christmas 2016 back-test: WAPE 20.1% vs 27.9% baseline; total units −11%; FROZEN FOODS rush only about half captured.
@@ -107,7 +125,11 @@ Clean table columns: date, store_nbr, family, sales, onpromotion, is_closed, cit
 - No bias correction (test +4.9% over vs Christmas −11% under; over-forecast is the safer error for stock-outs).
 
 ## Future work
-- days_since_holiday feature (would help the after-holiday weekend dip) — not added now because the test set has been seen.
+- (done in 6d: days_since_holiday, judged on back-tests only.)
+- A2 short-horizon models (days 1–3 using recent sales): skipped — breaks the 14-day rule and too complex for this project.
+- A5 promotion features (promotion vs normal level per category): skipped.
+- A6 hyper-parameter tuning / averaging several models: skipped.
+- A8 Kaggle submission for 2017-08-16..31 as a fresh unseen score: optional after Stage 7; needs a 16-day horizon (our model is 14 days) and Kaggle scores RMSLE, not WAPE.
 
 ## Honest limits (keep in report)
-Ecuador data, not Indian; no stock data (stock simulated); category level, not item level; sales ≠ demand when out of stock; weather did not help at category level; India season/festival mapping is rule-based; future promotions assumed 0.
+Ecuador data, not Indian; no stock data (stock simulated); category level, not item level; sales ≠ demand when out of stock; weather did not help at category level; India season/festival mapping is rule-based; future promotions = planned promotions from test.csv (0 where no plan); v2's test score was measured after the test had been seen.

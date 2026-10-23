@@ -9,3 +9,5 @@ requests==2.34.2
 # Pipeline only (src/forecast.py, notebooks); not needed by the app
 lightgbm==4.7.0
 matplotlib==3.11.0
+# Tests only (python3 -m pytest tests)
+pytest==9.1.1

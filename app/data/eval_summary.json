@@ -1,7 +1,0 @@
-{
-  "test_WAPE": 15.51,
-  "baseline_test_WAPE": 21.98,
-  "test_period": "2017-08-02 to 2017-08-15",
-  "WAPE_perishable": 12.0,
-  "WAPE_long_life": 17.2
-}

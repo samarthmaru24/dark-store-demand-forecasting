@@ -1,5 +1,7 @@
-# Calculations for the dashboard. No Streamlit here, so every function can be tested directly.
-# Reads only the precomputed files in app/data/ (built by src/build_app_data.py). Never runs the model.
+"""Calculations for the dashboard. No Streamlit here, so every function can be tested directly.
+
+Reads only the precomputed files in app/data/ (built by src/build_app_data.py). Never runs the model.
+"""
 import datetime as dt
 import json
 from pathlib import Path
@@ -25,15 +27,15 @@ HOT_MAX_C = 40        # daily max temperature >= 40 °C -> "Hot day"
 def load_data():
     d = {
         "history": pd.read_parquet(DATA / "history_last60.parquet"),
-        "forecast": pd.read_csv(DATA / "forecast_next14.csv", parse_dates=["date"]),
-        "plan": pd.read_csv(DATA / "reorder_plan.csv"),
+        "forecast": pd.read_parquet(DATA / "forecast_next14.parquet"),
+        "plan": pd.read_parquet(DATA / "reorder_plan.parquet"),
         "cat_err": pd.read_csv(DATA / "category_errors.csv"),
         "rules": pd.read_csv(DATA / "conditions_rules.csv"),
         "name_map": pd.read_csv(DATA / "festival_name_map.csv"),
         "stores": pd.read_csv(DATA / "stores.csv"),
     }
-    with open(DATA / "eval_summary.json") as f:
-        d["eval"] = json.load(f)
+    with open(DATA / "results.json") as f:
+        d["results"] = json.load(f)
     d["history"]["date"] = pd.to_datetime(d["history"]["date"])
     return d
 
@@ -64,27 +66,29 @@ def kpis(d, store, fams):
 
 
 def demand_series(d, store, fams, days=30):
-    # Long table: date, series, kind (actual / forecast), units, low, high
+    # Long table: date, series, kind (actual / forecast), units, low, high.
+    # One line per category (<= 4 categories) carries the 80% range from the quantile models. Row quantiles
+    # cannot be added up into a range for a total, so the "Total" view has no band (low/high left empty).
     h = d["history"]
     h = h[(h.store_nbr == store) & h.family.isin(fams) & (h.date > TODAY_DATA - pd.Timedelta(days=days))].copy()
     h.loc[h.is_closed == 1, "sales"] = np.nan
     fc = d["forecast"][(d["forecast"].store_nbr == store) & d["forecast"].family.isin(fams)].copy()
-    fc = fc.merge(d["cat_err"][["family", "WAPE_model"]], on="family", how="left")
-    fc["err"] = fc.forecast * fc.WAPE_model.fillna(0) / 100        # forecast ± category test WAPE
     by_cat = len(fams) <= 4
-    key = "family" if by_cat else None
     if by_cat:
         a = h.groupby(["family", "date"]).sales.sum(min_count=1).reset_index()
-        f = fc.groupby(["family", "date"])[["forecast", "err"]].sum().reset_index()
+        f = fc[["family", "date", "forecast", "forecast_low", "forecast_high"]].rename(
+            columns={"forecast_low": "low", "forecast_high": "high"})
     else:
         a = h.groupby("date").sales.sum(min_count=1).reset_index().assign(family="Total (selected categories)")
-        f = fc.groupby("date")[["forecast", "err"]].sum().reset_index().assign(family="Total (selected categories)")
+        f = fc.groupby("date")["forecast"].sum().reset_index().assign(family="Total (selected categories)")
+        f["low"], f["high"] = np.nan, np.nan
     a = a.rename(columns={"family": "series", "sales": "units"}).assign(kind="actual")
     f = f.rename(columns={"family": "series", "forecast": "units"}).assign(kind="forecast")
-    f["low"], f["high"] = (f.units - f.err).clip(lower=0), f.units + f.err
     # Start each forecast line at the last actual point so the two lines join
     join = a[a.date == TODAY_DATA].assign(kind="forecast", low=lambda x: x.units, high=lambda x: x.units)
-    out = pd.concat([a, join, f.drop(columns="err")], ignore_index=True)
+    if not by_cat:
+        join = join.assign(low=np.nan, high=np.nan)
+    out = pd.concat([a, join, f], ignore_index=True)
     return out.sort_values(["series", "kind", "date"]), by_cat
 
 
@@ -208,5 +212,6 @@ def shelf_life_split(d, store, fams):
         "group": ["Perishable", "Long-life"],
         "forecast_units": [float(s.get(1, 0)), float(s.get(0, 0))],
         "share_pct": [float(s.get(1, 0) / total * 100) if total else 0, float(s.get(0, 0) / total * 100) if total else 0],
-        "test_WAPE": [d["eval"]["WAPE_perishable"], d["eval"]["WAPE_long_life"]],
+        "backtest_WAPE": [d["results"]["backtest_6_windows"]["experiment_mean"]["v1+A4+Tweedie"]["WAPE_perishable"],
+                          d["results"]["backtest_6_windows"]["experiment_mean"]["v1+A4+Tweedie"]["WAPE_long_life"]],
     })

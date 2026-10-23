@@ -1,21 +1,26 @@
-# Stage 6c: copy the small precomputed files the dashboard needs into app/data/,
-# so the app can be deployed without raw/ or clean/. The app never runs the model.
-# Run from the project root (after src/forecast.py and src/reorder.py): python3 src/build_app_data.py
-import json
+"""Copy the small precomputed files the dashboard needs into app/data/.
+
+The app can then be deployed without raw/ or clean/, and it never runs the model.
+-> history_last60.parquet, stores.csv, forecast_next14.parquet, reorder_plan.parquet, category_errors.csv,
+   conditions_rules.csv, festival_name_map.csv, results.json
+Run from the project root (after forecast, reorder and results): python3 src/build_app_data.py
+"""
 import shutil
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
 CLEAN, REPORTS, RULES = ROOT / "clean", ROOT / "reports", ROOT / "data_rules"
 OUT = ROOT / "app" / "data"
 HISTORY_DAYS = 60
+COPIES = ["forecast_next14.parquet", "reorder_plan.parquet", "category_errors.csv", "results.json"]
 
 
 def build():
     OUT.mkdir(parents=True, exist_ok=True)
+    for old in ["forecast_next14.csv", "reorder_plan.csv", "eval_summary.json"]:     # earlier formats
+        (OUT / old).unlink(missing_ok=True)
     raw = pd.read_parquet(CLEAN / "store_sales_clean.parquet",
                           columns=["date", "store_nbr", "family", "sales", "is_closed", "never_sold",
                                    "city", "state", "store_type"])
@@ -26,22 +31,10 @@ def build():
     stores = raw[raw.date == last][["store_nbr", "city", "state", "store_type"]].drop_duplicates().sort_values("store_nbr")
     stores.to_csv(OUT / "stores.csv", index=False)
 
-    for f in ["forecast_next14.csv", "reorder_plan.csv", "category_errors.csv"]:
+    for f in COPIES:
         shutil.copy(REPORTS / f, OUT / f)
     for f in sorted(RULES.glob("*.csv")):
         shutil.copy(f, OUT / f.name)
-
-    # Test-period accuracy for the KPI row and the shelf-life panel (same numbers as 04_evaluation_run)
-    info = json.load(open(ROOT / "models" / "lgbm_final_info.json"))
-    test = pd.read_csv(REPORTS / "test_predictions.csv").merge(
-        pd.read_csv(REPORTS / "category_errors.csv")[["family", "is_perishable"]], on="family")
-    wape = lambda g: float(np.abs(g.sales - g.pred).sum() / g.sales.sum() * 100)
-    summary = {"test_WAPE": info["test_WAPE"], "baseline_test_WAPE": info["baseline_test_WAPE"],
-               "test_period": f"{test.date.min()} to {test.date.max()}",
-               "WAPE_perishable": round(wape(test[test.is_perishable == 1]), 1),
-               "WAPE_long_life": round(wape(test[test.is_perishable == 0]), 1)}
-    json.dump(summary, open(OUT / "eval_summary.json", "w"), indent=2)
-    print("eval_summary:", summary)
 
     total = 0
     for f in sorted(OUT.iterdir()):
