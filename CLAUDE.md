@@ -109,6 +109,10 @@ Clean table columns: date, store_nbr, family, sales, onpromotion, is_closed, cit
       B6 Python: Streamlit Cloud supports released Python versions still receiving security updates; pick it in "Advanced settings" (runtime.txt is ignored). Tested on 3.14 (local) and a fresh 3.12 venv from requirements.txt: 10 tests passed, app 0 exceptions.
       Reproducibility: python3 run_all.py --retrain reproduces results.json and the reorder plan identically.
       App: band = 80% range (≤ 4 categories), KPI = back-test error 13.7% vs 25.3% (test v1/v2 in the help text), per-store cached calculations, footer credits (Kaggle/Favorita, holidays, Open-Meteo CC BY 4.0).
+   6e Minimal redesign (2026-10-24, my request: simple, clean, less text) — app/app.py only, app/logic.py and all numbers unchanged.
+      Layout: filters in one top row (store, shelf life, categories; empty = all) → 4 number cards → tabs Forecast | Reorder | India planning | About; no sidebar. Long captions cut to one short note each (kept: "stock is simulated", "rule-based, not model output", test v1 vs v2 in About).
+      Fonts (.streamlit/config.toml, Google Fonts): Inter (text), Fraunces (headings, big numbers), JetBrains Mono (small labels). Category names shown as "Grocery II" (the CSV download is the same table as shown).
+      Trending is now a ▲/▼ list; reorder status shown as 🔴 Urgent / 🟡 Reorder / 🟢 OK. Checked: AppTest 6 scenarios 0 exceptions, screenshots at 1440 px and 390 px (phone).
 7. Finish & present — TODO: deploy on Streamlit Community Cloud, README, report, slides, 2-minute demo.
 
 ## For the report

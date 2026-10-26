@@ -1,9 +1,19 @@
 [theme]
 base = "light"
 primaryColor = "#2a78d6"
-backgroundColor = "#f9f9f7"
-secondaryBackgroundColor = "#f0efec"
-textColor = "#0b0b0b"
+backgroundColor = "#fbfbf9"
+secondaryBackgroundColor = "#f2f1ec"
+textColor = "#1a1a18"
+borderColor = "#e8e6df"
+dataframeHeaderBackgroundColor = "#f6f5f1"
+baseRadius = "10px"
+baseFontSize = 15
+# Three font families: Inter (text), Fraunces (headings and big numbers), JetBrains Mono (small labels)
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap"
+headingFont = "Fraunces:https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&display=swap"
+codeFont = "JetBrains Mono:https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400..600&display=swap"
+headingFontSizes = ["2.6rem", "1.55rem", "1.15rem"]
+headingFontWeights = [500, 500, 600]
 
 [browser]
 gatherUsageStats = false
