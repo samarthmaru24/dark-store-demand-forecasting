@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from model import (CHOSEN, MODELS, QUANTILES, REPORTS, TEST_START, TRAIN_START, baseline, feature_table,
+from model import (CHOSEN, MODELS, QUANTILES, RANGE_TARGET, REPORTS, TEST_START, TRAIN_START, baseline, feature_table,
                    fit_point, fit_quantile, metrics, predict_point, predict_quantile, variant, volume_wape, window)
 
 FILES = {"forecast_low": "lgbm_q10.txt", "forecast_high": "lgbm_q90.txt"}
@@ -60,6 +60,7 @@ def train_final(df):
     for col, a in QUANTILES.items():
         fit_quantile(data, feats, n_trees, a).booster_.save_model(str(MODELS / FILES[col]))
     info = {"variant": CHOSEN, "features": feats, "objective": obj, "tweedie_variance_power": 1.2,
+            "range_target": RANGE_TARGET,
             "n_trees": n_trees, "trained_from": str(TRAIN_START.date()), "trained_until": str(df.date.max().date()),
             "quantile_models": {col: {"file": FILES[col], "alpha": a} for col, a in QUANTILES.items()}}
     with open(MODELS / "lgbm_final_v2_info.json", "w") as f:

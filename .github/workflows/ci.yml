@@ -1,0 +1,105 @@
+# CI/CD for the dark-store demand forecast.
+# CI  (job "validate"): install, check structure + checksums + syntax, run the tests (pytest), keep a test report.
+# CD  (job "package"):  after CI passes, bundle the saved model, metrics, forecast and reorder plan as a download.
+# The Kaggle data (raw/, clean/) is never in git, so tests that need it are reported as skipped and the model
+# is not retrained here. Retraining and accuracy numbers come from running `python3 run_all.py --retrain` locally.
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate project and run tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies (requirements.txt)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Check project structure
+        run: |
+          missing=0
+          for f in requirements.txt run_all.py CHECKSUMS.txt app/app.py app/logic.py \
+                   src/features.py src/model.py src/train.py src/forecast.py src/reorder.py \
+                   models/lgbm_final_v2.txt models/lgbm_final_v2_info.json models/lgbm_q10.txt models/lgbm_q90.txt \
+                   reports/results.json reports/forecast_next14.parquet reports/reorder_plan.parquet \
+                   app/data/forecast_next14.parquet app/data/reorder_plan.parquet \
+                   tests/test_pipeline.py tests/test_models_and_app.py; do
+            if [ ! -f "$f" ]; then echo "::error::missing file: $f"; missing=1; fi
+          done
+          exit $missing
+
+      - name: Verify SHA-256 checksums (CHECKSUMS.txt)
+        run: grep -v '^#' CHECKSUMS.txt | sha256sum --check --strict -
+
+      - name: Python syntax check
+        run: python -m compileall -q src app tests run_all.py make_03_model.py make_stage5.py
+
+      - name: Run tests (pytest)
+        run: python -m pytest tests -v -rs --junitxml=test-results/pytest.xml
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: test-report
+          path: test-results/pytest.xml
+          retention-days: 30
+
+  package:
+    name: Package model and reports
+    needs: validate
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v5
+
+      - name: Collect model, metrics, forecast and charts
+        run: |
+          mkdir -p bundle
+          cp -r models bundle/models
+          mkdir -p bundle/reports
+          cp reports/*.json reports/*.csv reports/*.png bundle/reports/
+          cp README.md requirements.txt bundle/
+          {
+            echo "commit: ${GITHUB_SHA}"
+            echo "built:  $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "Numbers: reports/results.json (written by run_all.py on the full data, not by this workflow)."
+            echo
+            echo "SHA-256 of every file:"
+            (cd bundle && find . -type f ! -name MANIFEST.txt | sort | xargs sha256sum)
+          } > bundle/MANIFEST.txt
+          du -sh bundle
+
+      - name: Upload model and reports bundle
+        uses: actions/upload-artifact@v5
+        with:
+          name: dark-store-forecast-${{ github.sha }}
+          path: bundle/
+          retention-days: 30

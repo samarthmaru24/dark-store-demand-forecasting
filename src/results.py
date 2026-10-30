@@ -1,7 +1,8 @@
 """Collect every reported number into reports/results.json (single source of truth for README, report, app).
 
 Reads only files written by code: models/lgbm_v1_info.json (validation), reports/test_metrics.json (test v1/v2),
-reports/backtest*.csv, reports/christmas_backtest.json, reports/forecast_next14.parquet, reports/reorder_plan.parquet.
+reports/backtest*.csv, reports/tune_decisions.json (6i experiments), reports/christmas_backtest.json,
+reports/forecast_next14.parquet, reports/reorder_plan.parquet.
 Run from the project root: python3 src/results.py
 """
 import json
@@ -37,6 +38,8 @@ def build():
     def m(d):
         return {k: r(d[k]) for k in ["WAPE", "WAPE_perishable", "WAPE_long_life", "bias_pct"]}
 
+    tune = load(REPORTS / "tune_decisions.json")
+    steps = pd.read_csv(REPORTS / "tune_steps.csv")
     exp = ex.groupby("variant", sort=False)[["WAPE", "WAPE_perishable", "WAPE_long_life", "bias_pct"]].mean()
     res = {
         "chosen_model": "v2",
@@ -67,6 +70,15 @@ def build():
             "v2": {"WAPE": r(xmas["v2"]["WAPE"], 1), "units_vs_actual_pct": r((xmas["v2"]["units"] / xmas["units_actual"] - 1) * 100, 1)},
             "units_actual": round(xmas["units_actual"]),
             "categories": {f: {k: round(v) for k, v in d.items()} for f, d in xmas["categories"].items()}},
+        "experiments_6i": {
+            "rule": "keep only if the back-test mean improves by >= 0.3 points and at most 1 of 6 windows gets "
+                    "worse (steps 3-5 also: 2016 tuning-window mean not worse)",
+            "steps": {k: {x: v[x] for x in ["backtest_mean_new", "gain_points", "windows_worse", "tuning_mean_new", "kept"]
+                          if x in v} for k, v in tune.items() if k not in ("final", "2 start")},
+            "start_year": {s: {"backtest_mean_new": r(g.WAPE.mean(), 3), "kept": False}
+                           for s, g in steps[steps.step == "2 start"].groupby("candidate")},
+            "kept_model": "v2" if not any(v.get("kept") for v in tune.values()) else "changed",
+            "v2_backtest_mean": tune["final"]["backtest_mean"], "v2_tuning_mean": tune["final"]["tuning_mean"]},
         "forecast_2017-08-16_to_2017-08-29": {
             "model": "v2", "total_units": round(fc.forecast.sum()), "last_14_days_actual_units": round(last14),
             "change_vs_last_14_days_pct": r((fc.forecast.sum() / last14 - 1) * 100, 1),

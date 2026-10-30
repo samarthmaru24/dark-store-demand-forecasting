@@ -6,3 +6,12 @@ __pycache__/
 .venv/
 *.pkl
 .pytest_cache/
+# Local secrets and settings (never commit keys or passwords)
+.env
+.streamlit/secrets.toml
+.vscode/
+.idea/
+# Logs, temporary files and test reports
+*.log
+*.tmp
+test-results/

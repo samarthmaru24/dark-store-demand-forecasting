@@ -1,19 +1,22 @@
 [theme]
 base = "light"
 primaryColor = "#2a78d6"
-backgroundColor = "#fbfbf9"
-secondaryBackgroundColor = "#f2f1ec"
-textColor = "#1a1a18"
-borderColor = "#e8e6df"
-dataframeHeaderBackgroundColor = "#f6f5f1"
+backgroundColor = "#f5f7fa"
+secondaryBackgroundColor = "#eef1f5"
+textColor = "#0f172a"
+borderColor = "#e2e8f0"
+dataframeHeaderBackgroundColor = "#f8fafc"
 baseRadius = "10px"
 baseFontSize = 15
-# Three font families: Inter (text), Fraunces (headings and big numbers), JetBrains Mono (small labels)
+# Inter (text), Plus Jakarta Sans (headings and big numbers), JetBrains Mono (code only)
 font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap"
-headingFont = "Fraunces:https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&display=swap"
+headingFont = "Plus Jakarta Sans:https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400..800&display=swap"
 codeFont = "JetBrains Mono:https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400..600&display=swap"
-headingFontSizes = ["2.6rem", "1.55rem", "1.15rem"]
-headingFontWeights = [500, 500, 600]
+headingFontSizes = ["2.2rem", "1.25rem", "1.05rem"]
+headingFontWeights = [700, 650, 600]
+
+[client]
+toolbarMode = "viewer"
 
 [browser]
 gatherUsageStats = false

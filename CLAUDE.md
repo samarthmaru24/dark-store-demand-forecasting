@@ -30,7 +30,8 @@ Folder: ~/DSML-Project
 - models/ lgbm_v1 (Stage 4), lgbm_final (v1, Stage 5), lgbm_final_v2 (v2, current), lgbm_q10 / lgbm_q90 (80% range); *_info.json
 - reports/ charts q1–q6, q8–q12 (no q7), results.json (SINGLE SOURCE OF TRUTH for every number), test_metrics.json, backtest*.csv, christmas_backtest.json, forecast_next14.parquet, reorder_plan.parquet (+ .csv copies for download), test_predictions.csv (v1) / _v2.csv, category_errors.csv, festival_effect.csv
 - src/ features.py (v1 build_features unchanged + v2 add-on), model.py (settings, CHOSEN = "v2"), train.py, backtest.py, forecast.py, reorder.py, results.py, build_app_data.py — each has a module docstring
-- app/ app.py + logic.py + data/ (0.7 MB); data_rules/ India rules; tests/test_pipeline.py (pytest, 10 checks)
+- app/ app.py + logic.py + data/ (0.7 MB); data_rules/ India rules; tests/test_pipeline.py (pytest, 15 checks; 6 marked needs_data → skipped without clean/ and raw/) + tests/test_models_and_app.py (7 checks, no data needed: models load/predict/reject bad input, results.json = saved outputs, dashboard runs); src/tune.py (6i experiments)
+- .github/workflows/ci.yml — GitHub Actions: CI (Python 3.12, structure, CHECKSUMS, syntax, pytest → 16 passed / 6 skipped without data) + CD (bundle models/ + reports as a 30-day artifact; no deploy, no release). Remote: origin = https://github.com/samarthmaru24/dark-store-demand-forecasting.git
 - run_all.py: [--retrain → train] → forecast → reorder → backtest → results.json → app data
 - make_03_model.py (generator for 03_model.ipynb), make_stage5.py (generator for Stage 5; ran once)
 - CHECKSUMS.txt — SHA-256 of generator scripts, generated files and pipeline code. src/features.py was extended after generation (v2 add-on); tests/test_pipeline.py checks that the generated v1 build_features code is still in it unchanged.
@@ -102,8 +103,8 @@ Clean table columns: date, store_nbr, family, sales, onpromotion, is_closed, cit
       v2 = v1 + days_since_holiday (cap 60) + sales_lag_364, objective tweedie (variance_power 1.2) on raw sales. v1 still reproducible (model.variant("v1")).
       Test days (ALREADY SEEN, v2 scored afterwards): baseline 21.98 | v1 15.51 | v2 13.66 (perishable 10.6, long-life 15.1; low sellers 57.3 (v1 52.2) — worse, top sellers 13.1 (v1 15.1)).
       Christmas back-test: v1 20.1% (−11.0% units, reproduces Stage 5 exactly) | v2 17.8% (−2.2% units; FROZEN FOODS 750,276 vs actual 795,112).
-      A7 Ranges: quantile LightGBM (alpha 0.1 / 0.9, log1p target, v2 features). Back-test coverage mean 82.8% (81.6–84.4; perishable 81.2, long-life 83.5), test 83.6%. Forecast range clipped to include the point forecast in 155 of 24,206 rows (0.6%). Row ranges can't be summed into a total range → the app shows bands only per category.
-      Reorder (current): buffer = Σ over window max(forecast_high − forecast, 0), capped at 50% of forecast_window (624 rows capped), ≥ 1 unit for tiny categories (BABY CARE, BOOKS, HOME APPLIANCES). B3: Urgent only if avg daily forecast ≥ 1. Result: Urgent 206 / Reorder 1,237 / OK 286.
+      A7 Ranges (first version, replaced in 6g): quantile LightGBM (alpha 0.1 / 0.9, log1p target, v2 features). Back-test coverage mean 82.8% (81.6–84.4; perishable 81.2, long-life 83.5), test 83.6%. Forecast range clipped to include the point forecast in 155 of 24,206 rows (0.6%). Row ranges can't be summed into a total range → the app shows bands only per category.
+      Reorder (current): buffer = Σ over window max(forecast_high − forecast, 0), capped at 50% of forecast_window (624 rows capped), ≥ 1 unit for tiny categories (BABY CARE, BOOKS, HOME APPLIANCES). B3: Urgent only if avg daily forecast ≥ 1. Result with the first ranges: Urgent 206 / Reorder 1,237 / OK 286 (current: see 6g).
       Forecast (v2, 2017-08-16..29): 11,236,282 units vs 11,444,795 last 14 days (−1.8%).
       B5 tests: 10 passed (lag_14 / sales_lag_364 / trans / oil age, no same-day inputs, v1 code unchanged, splits, outputs, hand-made reorder example, festival dates, rule categories). A mutated lag test fails as expected.
       B6 Python: Streamlit Cloud supports released Python versions still receiving security updates; pick it in "Advanced settings" (runtime.txt is ignored). Tested on 3.14 (local) and a fresh 3.12 venv from requirements.txt: 10 tests passed, app 0 exceptions.
@@ -113,7 +114,50 @@ Clean table columns: date, store_nbr, family, sales, onpromotion, is_closed, cit
       Layout: filters in one top row (store, shelf life, categories; empty = all) → 4 number cards → tabs Forecast | Reorder | India planning | About; no sidebar. Long captions cut to one short note each (kept: "stock is simulated", "rule-based, not model output", test v1 vs v2 in About).
       Fonts (.streamlit/config.toml, Google Fonts): Inter (text), Fraunces (headings, big numbers), JetBrains Mono (small labels). Category names shown as "Grocery II" (the CSV download is the same table as shown).
       Trending is now a ▲/▼ list; reorder status shown as 🔴 Urgent / 🟡 Reorder / 🟢 OK. Checked: AppTest 6 scenarios 0 exceptions, screenshots at 1440 px and 390 px (phone).
-7. Finish & present — TODO: deploy on Streamlit Community Cloud, README, report, slides, 2-minute demo.
+   6f New dashboard (2026-10-27, my request: professional, clean, presentable; plan in DASHBOARD_PLAN.md) — CURRENT UI
+      Theme: navy header band, light cool-grey page (#f5f7fa), white cards, Inter + Plus Jakarta Sans; chart colours unchanged (validated palette); toolbar "viewer".
+      Layout: header → filters (store, shelf life, categories) → alert strip (urgent count, next India festival, weather) → 4 cards → 6 tabs:
+      Overview (30 → 14 day chart, top sellers this week, moving this week, order now, perishable vs long-life) | Category (who comes on top + rank change, category chart, trust label, "why") | Seasons & festivals (planning date, season filter, city, festivals, weather, month pattern, category-year search) | Reorder (table, urgent rows red, boost toggle, "Enter real stock", CSV) | All stores (click a row → opens store) | Model (back-test / unseen test / Christmas / range cards, test-days chart, error by category).
+      New pipeline step src/explain.py (after forecast) → reports/forecast_why.parquet: LightGBM pred_contrib of v2, grouped into 7 reasons; effect = next 14 days vs model's view of last 14 days. Check printed: contributions add up to the saved forecast (largest gap 0.000000 units).
+      build_app_data.py adds monthly_pattern.csv (Aug 2016–Jul 2017 only: earlier years have recording gaps, e.g. PRODUCE ~200 vs ~110,000 units/day; BOOKS left out) and test_daily.parquet (test days, all stores). App data still 0.7 MB.
+      Trust label (category_errors.csv, v1 unseen test): Reliable < 20%, Rough guide < 50%, else Low confidence (also < 1 unit/day per store). Tiny sellers skipped in "Order now" preview and month ranking.
+      "Enter real stock" re-runs the src/reorder.py rule for typed rows only (others keep saved values). Runs-out date = 15 Aug + floor(days_of_cover) + 1.
+      Tests: 12 passed (+ typed stock = reorder rule; new app files complete, month pattern ends before test). AppTest 9 scenarios 0 exceptions; screenshots 1440 px and 390 px.
+      FOUND: the 10% range model was far too low for big sellers (e.g. BEVERAGES store 44: low 790 vs forecast 8,903–15,800/day) → fixed in 6g.
+   6g Range fix + remaining dashboard items (2026-10-27, my OK: "make the changes") — CURRENT STATE
+      Diagnosis (back-tests, by point-forecast size): big sellers (≥ 1,000 units/day) had 0.3% below the low end and 15.4% above the high end (ideal 10 / 10); overall coverage 82.8% hid it.
+      Fix: range models learn log1p(sales) − log1p(mean_28) (relative to the recent level; mean_28 is 14+ days old) = RANGE_TARGET "relative" in src/model.py ("level" = old, still reproducible); saved in lgbm_final_v2_info.json (range_target).
+      Rule stated before the run: accept if mean coverage within 80 ± 3 and big sellers' below/above both closer to 10. python3 src/backtest.py --ranges-experiment (reports/backtest_ranges_experiment.csv), means over 6 windows:
+        all: level 82.8 cov (7.3 below / 9.9 above) | relative 80.0 (10.4 / 9.7); 1000+: level 84.4 (0.3 / 15.4) | relative 77.7 (11.8 / 10.5); 100–1000: level 80.1 (9.1 / 10.8) | relative 77.8 (11.8 / 10.3). → accepted. Weak spot: window 2017-04-10, 1000+ below low 23.5%.
+      After python3 run_all.py --retrain: v2 point model file, forecast, back-test WAPEs and Christmas results identical to before. Back-test range coverage 80.0% (77.8–81.3; perishable 78.5, long-life 80.6); test 78.2% (was 83.6%, test already seen). Range clipped to include the point forecast: 1,071 of 24,206 rows (4.4%, was 0.6%). Range total per row summed 9,599,139 to 13,563,677.
+      Reorder now: Urgent 206 / Reorder 1,253 / OK 270 (50 status changes: 17 OK→Reorder, 33 Reorder→OK); total buffer 1,288,595 → 1,808,454 units, total order 2,305,658 → 2,660,234 (stock simulated); 590 rows capped at 50%.
+      python3 run_all.py (no retrain) run twice → results.json, reorder plan, forecast, forecast_why identical.
+      Dashboard additions: Ecuador holiday shading (app/data/holidays_window.parquet, 01_cleaning rules; store 44 = 11 Aug), extra-promotion dots in the category chart (days above the 14-day median of planned onpromotion), festival timeline (stock-by → festival day, next 60 days), safety stock Low / Normal / High (buffer × 0.5 / 1 / 1.5; Normal = agreed rule), printable HTML order sheet. Heatmap removed (replaced by the ranking).
+      Tests: 13 passed (+ safety level, holiday rules).
+   6h UI polish + click tests (2026-10-27) — app/app.py only, numbers unchanged
+      Header shows the selected store; white filter bar and chart panels; tab icons; coloured ▲▼ deltas; urgent card tinted red; Overview lists 5 rows each; Reorder tab title; chart right margin.
+      Real-browser click tests (headless Chrome): typed stock 0 for Automotive → Urgent 2 → 3, To reorder 21 → 20, kept after closing the popover and switching tabs; Download menu has CSV + printable sheet; All stores row click → store 3 (487,195 units, 7 urgent). 0 exceptions. AppTest 15 scenarios 0 exceptions; 13 tests passed.
+      DASHBOARD_GUIDE.md = presenter notes: every feature, why it exists, demo path, likely questions.
+   6i Accuracy experiments (2026-10-27, my OK: tuning + start year, then holiday features, "even more") — src/tune.py
+      RULES WRITTEN BEFORE THE RUN. Locked test days never used. #5 (days 1–3 models) NOT done: needs relaxing the 14-day rule (my decision).
+      Tuning windows (new, never used): 4 × 14 days in 2016 starting 2016-02-01 (Carnaval), 06-06, 08-01 (moved independence holiday), 10-31 (Difuntos + Cuenca + bridge); always trained from 2015-01-01.
+      Steps, each starting from the model kept by the step before (start = v2):
+        1 settings: step-by-step search on the tuning windows only — num_leaves {63,127,255} → Tweedie power {1.1,1.2,1.3,1.5} → min_child_samples {20,50,200} → colsample_bytree {0.5,0.8}; trees checked at 140/300/500/800/1200/1600/2000. Lowest mean tuning WAPE wins, then it must pass RULE on the back-tests.
+        2 start year: 2014-01-01 or 2016-01-01 instead of 2015-01-01 (back-tests only); must pass RULE; if both pass, lower mean wins.
+        3 holiday features (national holiday kind: holiday / moved / bridge / extra shopping day, long weekend, days to / since a real day off, name of the nearest holiday): RULE + tuning mean not worse.
+        4 promotion feature (planned promotions minus the recent 28-day level, 14+ days old): RULE + tuning mean not worse.
+        5 average of 3 seeds (geometric mean, so the "why" parts still add up): RULE + tuning mean not worse.
+      RULE: back-test mean WAPE improves by ≥ 0.3 points AND at most 1 of the 6 windows gets worse.
+      After the decisions: test WAPE reported for v1 / v2 / new side by side (test already seen, never used to decide); 80% range coverage on back-tests must stay within 80 ± 3, else report and ask.
+      RESULT (python3 src/tune.py, about 6 h; reports/tune_settings.csv, tune_steps.csv, tune_decisions.json): NOTHING KEPT → v2 stays (back-test 13.72, tuning windows 14.73). No new model, so no new test score.
+        1 settings: search picked 255 leaves, power 1.3, min_child 50, colsample 0.8, 2000 trees (edge of the grid), tuning 13.82 → back-tests 13.98 (−0.25, 2 worse; better in 4 windows but January 2017 20.15 vs 15.29) → rejected.
+        2 start year: 2014 → 13.48 (+0.24, 3 worse), 2016 → 13.63 (+0.09, 3 worse) → rejected.
+        3 holiday: 13.81 (−0.08, 2 worse), tuning 15.03 → rejected. Helped Easter 2017-04-10 (17.59 → 16.25), Carnaval, Aug 2016 (13.00 → 12.35); hurt Jan 2017 (17.18) and Nov 2016 (18.14).
+        4 promo: 14.12 (−0.39, 3 worse), tuning 14.52 → rejected.
+        5 seeds: 13.55 (+0.17, 1 worse), tuning 14.68 → rejected (closest).
+      Pipeline left on v2: python3 run_all.py --retrain → model file, forecast, why, plan, back-tests, Christmas identical (SHA-256). Kept: src/tune.py, features.add_v3_features (unused by v2), model.load_holidays + window(train_start); results.json "experiments_6i"; Model tab line "More tries, none kept". Tests: 15 passed (+ holiday features on known days, promo level 14+ days old). CHECKSUMS 21 OK.
+      Lesson: the 6 back-test windows differ a lot (Jan 2017 is unstable); small gains don't hold everywhere. Remaining big lever = #5 short-horizon models (needs my decision on the 14-day rule).
+7. Finish & present — IN PROGRESS (2026-10-30: GitHub repo + CI/CD files ready, not pushed yet). TODO: deploy on Streamlit Community Cloud, README, report, slides, 2-minute demo.
 
 ## For the report
 (all numbers: reports/results.json)
@@ -121,7 +165,8 @@ Clean table columns: date, store_nbr, family, sales, onpromotion, is_closed, cit
 - Fine-tuning judged on 6 back-test windows only: v2 13.72% vs v1 15.32% vs baseline 25.31%. v2 test 13.66% was measured after the test had been seen (37.9% better than baseline) — say so.
 - v2 is better for top sellers (13.1 vs 15.1) but worse for low sellers (57.3 vs 52.2).
 - Christmas back-test v2 17.8% (units −2.2%) vs v1 20.1% (−11%): same-day-last-year helps festival rushes.
-- 80% prediction ranges cover 82.8% of actual values in back-tests (slightly wide).
+- 6i: 5 more improvement tries (bigger model, start year, holiday features, promotion feature, 3 seeds) all failed the pre-set rule → v2 stays. Holiday features helped holiday windows but hurt others.
+- 80% prediction ranges cover 80.0% of actual values in back-tests. The first version covered 82.8% overall but was badly off for big sellers (0.3% below low / 15.4% above high, ideal 10/10); learning the range relative to the recent level fixed it (11.8 / 10.5), judged on back-tests only.
 - Valid→test gap (12.7% → 15.5%) mainly 12–13 Aug, the weekend after the 11 Aug (transferred) national holiday.
 - Perishable 12.0% vs long-life 17.2%; low sellers 52.2%, top sellers 15.1% → volume matters more than shelf life.
 - Christmas 2016 back-test: WAPE 20.1% vs 27.9% baseline; total units −11%; FROZEN FOODS rush only about half captured.

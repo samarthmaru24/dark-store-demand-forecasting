@@ -4,7 +4,12 @@ Base settings are the ones agreed in Stages 4-5 (notebooks/04_evaluation.ipynb):
 no weather, every past-sales clue at least 14 days old (src/features.py).
   v1 = 31 features, target log1p(sales)                         (Stage 5 model, models/lgbm_final.txt)
   v2 = v1 + days_since_holiday + sales_lag_364, Tweedie on raw sales (kept after the back-test experiment)
-Prediction ranges: quantile models (10% and 90%) with the chosen feature set, on log1p(sales).
+  (6i accuracy experiments, src/tune.py: settings, start year, holiday + promotion features, 3 seeds - none
+   passed the rule, so v2 stays. load_holidays() and window(train_start=...) are used there.)
+Prediction ranges: quantile models (10% and 90%) with the chosen feature set.
+  "level"    = quantile of log1p(sales)                                   (6d, A7)
+  "relative" = quantile of log1p(sales) - log1p(mean_28), i.e. relative to the category's recent level
+               (mean_28 is 14+ days old). Tested with python3 src/backtest.py --ranges-experiment.
 """
 import json
 import sys
@@ -29,6 +34,8 @@ QUANTILES = {"forecast_low": 0.1, "forecast_high": 0.9}
 PARAMS = dict(learning_rate=0.05, num_leaves=127, min_child_samples=50, subsample=0.8, subsample_freq=1,
               colsample_bytree=0.8, random_state=42, verbose=-1)
 CHOSEN = "v2"                                        # decided on back-tests only (see CLAUDE.md)
+RANGE_TARGET = "relative"                           # "level" or "relative" (see docstring)
+RANGE_REF = "mean_28"
 
 
 def final_info():
@@ -56,6 +63,10 @@ def load_weather():
     return pd.read_csv(ROOT / "raw" / "weather_ecuador" / "weather.csv", parse_dates=["date"])
 
 
+def load_holidays():
+    return pd.read_csv(ROOT / "raw" / "store_sales" / "holidays_events.csv", parse_dates=["date"])
+
+
 def feature_table(raw=None):
     # v2 table: has every v1 column plus the two v2 columns, so both variants can use it
     raw = load_clean() if raw is None else raw
@@ -76,14 +87,23 @@ def predict_point(model, part, feats, objective="log1p"):
     return (p if objective == "tweedie" else np.expm1(p)).clip(0)
 
 
-def fit_quantile(train, feats, n_trees, alpha):
-    # Quantiles survive the log1p transform, so a quantile of log1p(sales) maps back with expm1
+def range_ref(part, target):
+    # log1p of the reference level the range model works relative to (0 for "level")
+    if target == "relative":
+        return np.log1p(part[RANGE_REF].fillna(0).to_numpy())
+    return 0.0
+
+
+def fit_quantile(train, feats, n_trees, alpha, target=None):
+    # Quantiles survive the log1p transform (and a shift by a known value), so they map back with expm1
+    target = target or RANGE_TARGET
     m = lgb.LGBMRegressor(objective="quantile", alpha=alpha, n_estimators=n_trees, **PARAMS)
-    return m.fit(train[feats], np.log1p(train.sales))
+    return m.fit(train[feats], np.log1p(train.sales) - range_ref(train, target))
 
 
-def predict_quantile(model, part, feats):
-    return np.expm1(model.predict(part[feats])).clip(0)
+def predict_quantile(model, part, feats, target=None):
+    target = target or RANGE_TARGET
+    return np.expm1(model.predict(part[feats]) + range_ref(part, target)).clip(0)
 
 
 def baseline(df, part, start):
@@ -107,9 +127,9 @@ def volume_wape(part, pred_col):
     return {str(k): wape(g.sales, g[pred_col]) for k, g in part.groupby(vol, observed=True)}
 
 
-def window(df, start, days=14):
-    # (train, part) for a window starting at `start`; open days only, train from TRAIN_START
+def window(df, start, days=14, train_start=TRAIN_START):
+    # (train, part) for a window starting at `start`; open days only, train from train_start
     open_ = df.is_closed == 0
-    train = df[(df.date >= TRAIN_START) & (df.date < start) & open_]
+    train = df[(df.date >= train_start) & (df.date < start) & open_]
     part = df[(df.date >= start) & (df.date < start + pd.Timedelta(days=days)) & open_].copy()
     return train, part

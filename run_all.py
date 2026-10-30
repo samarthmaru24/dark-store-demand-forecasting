@@ -1,6 +1,6 @@
 """Run the whole pipeline in order, from the project root.
 
-  python3 run_all.py            forecast -> reorder -> back-tests -> results.json -> app data (uses saved models)
+  python3 run_all.py            forecast -> explain -> reorder -> back-tests -> results.json -> app data (uses saved models)
   python3 run_all.py --retrain  first retrain v2 + range models (src/train.py), then the steps above
 
 Needs raw/ and clean/ locally (they are never committed). Stops at the first failing step.
@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-STEPS = ["src/forecast.py", "src/reorder.py", "src/backtest.py", "src/results.py", "src/build_app_data.py"]
+STEPS = ["src/forecast.py", "src/explain.py", "src/reorder.py", "src/backtest.py", "src/results.py", "src/build_app_data.py"]
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()

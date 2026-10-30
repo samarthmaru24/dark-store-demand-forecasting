@@ -1,0 +1,63 @@
+step,candidate,windows,window_start,WAPE
+0 v2,v2,back-test,2017-01-16,15.290653189749873
+0 v2,v2,back-test,2017-02-27,13.85492072334788
+0 v2,v2,back-test,2017-04-10,17.587804854136948
+0 v2,v2,back-test,2017-05-22,12.599772401433274
+0 v2,v2,back-test,2017-06-19,10.628756273266308
+0 v2,v2,back-test,2017-07-19,12.371802540335871
+0 v2,v2,tuning,2016-02-01,15.6290568537162
+0 v2,v2,tuning,2016-06-06,14.651921737160665
+0 v2,v2,tuning,2016-08-01,13.00044052301535
+0 v2,v2,tuning,2016-10-31,15.64643230632069
+1 settings,"{'num_leaves': 255, 'power': 1.3, 'min_child_samples': 50, 'colsample_bytree': 0.8, 'n_trees': 2000}",back-test,2017-01-16,20.14896017453177
+1 settings,"{'num_leaves': 255, 'power': 1.3, 'min_child_samples': 50, 'colsample_bytree': 0.8, 'n_trees': 2000}",back-test,2017-02-27,13.359367460870223
+1 settings,"{'num_leaves': 255, 'power': 1.3, 'min_child_samples': 50, 'colsample_bytree': 0.8, 'n_trees': 2000}",back-test,2017-04-10,15.76249020801862
+1 settings,"{'num_leaves': 255, 'power': 1.3, 'min_child_samples': 50, 'colsample_bytree': 0.8, 'n_trees': 2000}",back-test,2017-05-22,13.087790657813287
+1 settings,"{'num_leaves': 255, 'power': 1.3, 'min_child_samples': 50, 'colsample_bytree': 0.8, 'n_trees': 2000}",back-test,2017-06-19,10.243714147782912
+1 settings,"{'num_leaves': 255, 'power': 1.3, 'min_child_samples': 50, 'colsample_bytree': 0.8, 'n_trees': 2000}",back-test,2017-07-19,11.255837134564436
+1 settings,"{'num_leaves': 255, 'power': 1.3, 'min_child_samples': 50, 'colsample_bytree': 0.8, 'n_trees': 2000}",tuning,2016-02-01,14.398428828949239
+1 settings,"{'num_leaves': 255, 'power': 1.3, 'min_child_samples': 50, 'colsample_bytree': 0.8, 'n_trees': 2000}",tuning,2016-06-06,13.432575665451104
+1 settings,"{'num_leaves': 255, 'power': 1.3, 'min_child_samples': 50, 'colsample_bytree': 0.8, 'n_trees': 2000}",tuning,2016-08-01,12.795725210933831
+1 settings,"{'num_leaves': 255, 'power': 1.3, 'min_child_samples': 50, 'colsample_bytree': 0.8, 'n_trees': 2000}",tuning,2016-10-31,14.666325850439591
+2 start,2014-01-01,back-test,2017-01-16,13.737509664997427
+2 start,2014-01-01,back-test,2017-02-27,13.653925702496345
+2 start,2014-01-01,back-test,2017-04-10,17.691705802899367
+2 start,2014-01-01,back-test,2017-05-22,12.713339109200033
+2 start,2014-01-01,back-test,2017-06-19,10.807052724208303
+2 start,2014-01-01,back-test,2017-07-19,12.292249801963692
+2 start,2016-01-01,back-test,2017-01-16,12.871410159419497
+2 start,2016-01-01,back-test,2017-02-27,13.708958384930584
+2 start,2016-01-01,back-test,2017-04-10,19.588362039144762
+2 start,2016-01-01,back-test,2017-05-22,12.87044631563565
+2 start,2016-01-01,back-test,2017-06-19,10.367158762436073
+2 start,2016-01-01,back-test,2017-07-19,12.39966999730601
+3 holiday,"+hol_type,long_weekend,days_to_day_off,days_since_day_off,near_holiday",back-test,2017-01-16,17.177968474295945
+3 holiday,"+hol_type,long_weekend,days_to_day_off,days_since_day_off,near_holiday",back-test,2017-02-27,13.62110751388104
+3 holiday,"+hol_type,long_weekend,days_to_day_off,days_since_day_off,near_holiday",back-test,2017-04-10,16.248241863001763
+3 holiday,"+hol_type,long_weekend,days_to_day_off,days_since_day_off,near_holiday",back-test,2017-05-22,12.90702959213709
+3 holiday,"+hol_type,long_weekend,days_to_day_off,days_since_day_off,near_holiday",back-test,2017-06-19,10.581643584419492
+3 holiday,"+hol_type,long_weekend,days_to_day_off,days_since_day_off,near_holiday",back-test,2017-07-19,12.302551219709477
+3 holiday,"+hol_type,long_weekend,days_to_day_off,days_since_day_off,near_holiday",tuning,2016-02-01,15.512506249096313
+3 holiday,"+hol_type,long_weekend,days_to_day_off,days_since_day_off,near_holiday",tuning,2016-06-06,14.133429132613204
+3 holiday,"+hol_type,long_weekend,days_to_day_off,days_since_day_off,near_holiday",tuning,2016-08-01,12.34634171301583
+3 holiday,"+hol_type,long_weekend,days_to_day_off,days_since_day_off,near_holiday",tuning,2016-10-31,18.13756921546215
+4 promo,+promo_vs_recent,back-test,2017-01-16,18.02526115502306
+4 promo,+promo_vs_recent,back-test,2017-02-27,13.468133479966376
+4 promo,+promo_vs_recent,back-test,2017-04-10,17.43774969262022
+4 promo,+promo_vs_recent,back-test,2017-05-22,12.808230321946787
+4 promo,+promo_vs_recent,back-test,2017-06-19,10.553028070707956
+4 promo,+promo_vs_recent,back-test,2017-07-19,12.398743790100122
+4 promo,+promo_vs_recent,tuning,2016-02-01,15.875212170139791
+4 promo,+promo_vs_recent,tuning,2016-06-06,13.914890235413921
+4 promo,+promo_vs_recent,tuning,2016-08-01,12.80900392935875
+4 promo,+promo_vs_recent,tuning,2016-10-31,15.467360539952171
+5 seeds,"[42, 43, 44]",back-test,2017-01-16,14.902047613706815
+5 seeds,"[42, 43, 44]",back-test,2017-02-27,13.378356352546996
+5 seeds,"[42, 43, 44]",back-test,2017-04-10,17.568704830433266
+5 seeds,"[42, 43, 44]",back-test,2017-05-22,12.668954608400085
+5 seeds,"[42, 43, 44]",back-test,2017-06-19,10.492007399326592
+5 seeds,"[42, 43, 44]",back-test,2017-07-19,12.292322482896347
+5 seeds,"[42, 43, 44]",tuning,2016-02-01,15.742440826756237
+5 seeds,"[42, 43, 44]",tuning,2016-06-06,14.401052621376076
+5 seeds,"[42, 43, 44]",tuning,2016-08-01,13.09179527449465
+5 seeds,"[42, 43, 44]",tuning,2016-10-31,15.495069858324149

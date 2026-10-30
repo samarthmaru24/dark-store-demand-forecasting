@@ -37,6 +37,7 @@
   ],
   "objective": "tweedie",
   "tweedie_variance_power": 1.2,
+  "range_target": "relative",
   "n_trees": 140,
   "trained_from": "2015-01-01",
   "trained_until": "2017-08-15",

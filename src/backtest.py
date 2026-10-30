@@ -7,6 +7,9 @@ model and the 14-day-average baseline (WAPE). Model changes are accepted or reje
                                         -> reports/backtest.csv, backtest_ranges.csv, christmas_backtest.json,
                                            q12_backtest.png
   python3 src/backtest.py --experiment  v1 vs v1+A4 features vs v1+A4+Tweedie -> reports/backtest_experiment.csv
+  python3 src/backtest.py --ranges-experiment
+                                        80% range: "level" vs "relative" target, coverage and calibration by
+                                        seller size -> reports/backtest_ranges_experiment.csv
 """
 import argparse
 import json
@@ -42,6 +45,37 @@ def experiment(df, feats_v1, n_trees):
     summary = res.groupby("variant", sort=False)[["WAPE", "WAPE_perishable", "WAPE_long_life", "bias_pct"]].mean()
     print("\nMean over the 6 back-test windows (simple average of window WAPEs):")
     print(summary.round(2).to_string())
+    return summary
+
+
+SIZE_BANDS = [-1, 10, 100, 1000, np.inf]
+SIZE_LABELS = ["under 10", "10-100", "100-1000", "1000+"]     # point forecast, units/day
+
+
+def ranges_experiment(df):
+    # Same windows, same 140 trees; only the range target changes. Ideal: 10% below low, 10% above high.
+    feats, obj, n_trees = variant(CHOSEN)
+    rows = []
+    for s in BACKTEST_STARTS:
+        train, part = window(df, s)
+        part["pred"] = predict_point(fit_point(train, feats, n_trees, obj), part, feats, obj)
+        size = pd.cut(part.pred, SIZE_BANDS, labels=SIZE_LABELS)
+        for target in ["level", "relative"]:
+            q = {col: predict_quantile(fit_quantile(train, feats, n_trees, a, target), part, feats, target)
+                 for col, a in QUANTILES.items()}
+            lo, hi = np.minimum(q["forecast_low"], part.pred), np.maximum(q["forecast_high"], part.pred)
+            below, above = part.sales < lo, part.sales > hi
+            for band, idx in [("all", part.index)] + [(b, part.index[size == b]) for b in SIZE_LABELS]:
+                rows.append({"window_start": s.date(), "target": target, "size": band, "rows": len(idx),
+                             "coverage_pct": (~below[idx] & ~above[idx]).mean() * 100,
+                             "below_low_pct": below[idx].mean() * 100, "above_high_pct": above[idx].mean() * 100})
+            print(f"  {s.date()} {target:8s} coverage {rows[-5]['coverage_pct']:.1f}% | 1000+: below "
+                  f"{rows[-1]['below_low_pct']:.1f}% above {rows[-1]['above_high_pct']:.1f}%")
+    res = pd.DataFrame(rows)
+    res.to_csv(REPORTS / "backtest_ranges_experiment.csv", index=False)
+    summary = res.groupby(["size", "target"], sort=False)[["coverage_pct", "below_low_pct", "above_high_pct"]].mean()
+    print("\nMean over the 6 back-test windows (ideal: coverage 80, below 10, above 10):")
+    print(summary.round(1).to_string())
     return summary
 
 
@@ -124,9 +158,12 @@ def plot(bt):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--experiment", action="store_true")
+    ap.add_argument("--ranges-experiment", action="store_true")
     args = ap.parse_args()
     df = feature_table()
-    if args.experiment:
+    if args.ranges_experiment:
+        ranges_experiment(df)
+    elif args.experiment:
         info = final_info()
         experiment(df, info["features"], info["n_trees"])
     else:

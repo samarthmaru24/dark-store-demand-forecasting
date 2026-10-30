@@ -1,7 +1,7 @@
 """Forecast the next H = 14 days after the last day in the data (2017-08-16 .. 2017-08-29).
 
-Point forecast: models/lgbm_final_v2.txt (v2). 80% range: quantile models lgbm_q10.txt / lgbm_q90.txt,
-clipped so forecast_low <= forecast <= forecast_high. Every past-sales clue is at least 14 days old, so the
+Point forecast: models/lgbm_final_v2.txt (v2). 80% range: quantile models lgbm_q10.txt / lgbm_q90.txt
+(range target as saved in lgbm_final_v2_info.json), clipped so forecast_low <= forecast <= forecast_high. Every past-sales clue is at least 14 days old, so the
 14 future days only need sales up to the last data day: no recursive forecasting.
 Assumptions (say so in the dashboard): onpromotion = planned promotions from raw/store_sales/test.csv
 (the store knows its promotion calendar; 0 where no plan), all stores open, no earthquake.
@@ -81,8 +81,9 @@ def make_forecast():
     fut = df[(df.date > last) & (df.date <= last + pd.Timedelta(days=H))].copy()
     point = lgb.Booster(model_file=str(MODELS / "lgbm_final_v2.txt"))
     fut["forecast"] = predict_point(point, fut, feats, info["objective"])
+    target = info.get("range_target", "level")       # older model files: level target
     for col, q in info["quantile_models"].items():
-        fut[col] = predict_quantile(lgb.Booster(model_file=str(MODELS / q["file"])), fut, feats)
+        fut[col] = predict_quantile(lgb.Booster(model_file=str(MODELS / q["file"])), fut, feats, target)
     # The three models are trained separately, so a range can miss the point forecast: clip and count it
     clipped = (fut.forecast_low > fut.forecast) | (fut.forecast_high < fut.forecast)
     fut["forecast_low"] = np.minimum(fut.forecast_low, fut.forecast)

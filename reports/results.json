@@ -38,7 +38,7 @@
         "medium sellers": 24.7,
         "top sellers": 13.1
       },
-      "range_coverage_pct": 83.6
+      "range_coverage_pct": 78.2
     },
     "v1_improvement_vs_baseline_pct": 29.4,
     "v2_improvement_vs_baseline_pct": 37.9
@@ -86,11 +86,11 @@
     },
     "range_coverage_pct": {
       "target": 80,
-      "mean": 82.8,
-      "min": 81.6,
-      "max": 84.4,
-      "perishable": 81.2,
-      "long_life": 83.5
+      "mean": 80.0,
+      "min": 77.8,
+      "max": 81.3,
+      "perishable": 78.5,
+      "long_life": 80.6
     }
   },
   "christmas_backtest": {
@@ -132,6 +132,51 @@
       }
     }
   },
+  "experiments_6i": {
+    "rule": "keep only if the back-test mean improves by >= 0.3 points and at most 1 of 6 windows gets worse (steps 3-5 also: 2016 tuning-window mean not worse)",
+    "steps": {
+      "1 settings": {
+        "backtest_mean_new": 13.976,
+        "gain_points": -0.254,
+        "windows_worse": 2,
+        "kept": false
+      },
+      "3 holiday": {
+        "backtest_mean_new": 13.806,
+        "gain_points": -0.084,
+        "windows_worse": 2,
+        "tuning_mean_new": 15.032,
+        "kept": false
+      },
+      "4 promo": {
+        "backtest_mean_new": 14.115,
+        "gain_points": -0.393,
+        "windows_worse": 3,
+        "tuning_mean_new": 14.517,
+        "kept": false
+      },
+      "5 seeds": {
+        "backtest_mean_new": 13.55,
+        "gain_points": 0.172,
+        "windows_worse": 1,
+        "tuning_mean_new": 14.683,
+        "kept": false
+      }
+    },
+    "start_year": {
+      "2014-01-01": {
+        "backtest_mean_new": 13.483,
+        "kept": false
+      },
+      "2016-01-01": {
+        "backtest_mean_new": 13.634,
+        "kept": false
+      }
+    },
+    "kept_model": "v2",
+    "v2_backtest_mean": 13.722,
+    "v2_tuning_mean": 14.732
+  },
   "forecast_2017-08-16_to_2017-08-29": {
     "model": "v2",
     "total_units": 11236282,
@@ -142,8 +187,8 @@
   "reorder_plan": {
     "rows": 1729,
     "Urgent": 206,
-    "Reorder": 1237,
-    "OK": 286,
+    "Reorder": 1253,
+    "OK": 270,
     "stock": "SIMULATED"
   }
 }

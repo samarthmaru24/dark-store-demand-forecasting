@@ -22,6 +22,12 @@ INDIA_CITIES = {  # lat, lon
 RAINY_MM = 5          # daily rain >= 5 mm -> "Rainy day"
 COLD_MAX_C = 15       # daily max temperature <= 15 °C -> "Cold day"
 HOT_MAX_C = 40        # daily max temperature >= 40 °C -> "Hot day"
+# Trust label per category, from the test error of the first (unseen) model in category_errors.csv
+RELIABLE_WAPE, ROUGH_WAPE = 20, 50
+LOW_SELLER = 1.0      # units/day per store, same rule as src/reorder.py
+URGENT_DAYS = 2       # same rule as src/reorder.py
+# Safety level (user what-if): multiplies the saved safety buffer. "Normal" = the agreed buffer (src/reorder.py).
+SAFETY_LEVELS = {"Low": 0.5, "Normal": 1.0, "High": 1.5}
 
 
 def load_data():
@@ -33,6 +39,10 @@ def load_data():
         "rules": pd.read_csv(DATA / "conditions_rules.csv"),
         "name_map": pd.read_csv(DATA / "festival_name_map.csv"),
         "stores": pd.read_csv(DATA / "stores.csv"),
+        "why": pd.read_parquet(DATA / "forecast_why.parquet"),
+        "pattern": pd.read_csv(DATA / "monthly_pattern.csv"),
+        "test_daily": pd.read_parquet(DATA / "test_daily.parquet"),
+        "holidays": pd.read_parquet(DATA / "holidays_window.parquet"),
     }
     with open(DATA / "results.json") as f:
         d["results"] = json.load(f)
@@ -215,3 +225,145 @@ def shelf_life_split(d, store, fams):
         "backtest_WAPE": [d["results"]["backtest_6_windows"]["experiment_mean"]["v1+A4+Tweedie"]["WAPE_perishable"],
                           d["results"]["backtest_6_windows"]["experiment_mean"]["v1+A4+Tweedie"]["WAPE_long_life"]],
     })
+
+
+def trust(d):
+    # family -> (label, test error %). Tiny sellers (< 1 unit/day per store) are always "Low confidence".
+    out = {}
+    for r in d["cat_err"].itertuples():
+        if r.avg_units_per_day < LOW_SELLER or r.WAPE_model >= ROUGH_WAPE:
+            label = "Low confidence"
+        elif r.WAPE_model >= RELIABLE_WAPE:
+            label = "Rough guide"
+        else:
+            label = "Reliable"
+        out[r.family] = (label, float(r.WAPE_model))
+    return out
+
+
+def top_now(d, store, fams, n=5):
+    # Units sold in the last 7 days (data's today), biggest first, with share of the selection
+    h = d["history"]
+    h = h[(h.store_nbr == store) & h.family.isin(fams) & (h.date > TODAY_DATA - pd.Timedelta(days=7))]
+    t = h.groupby("family").sales.sum().sort_values(ascending=False)
+    total = t.sum()
+    out = t.head(n).rename("units").reset_index()
+    out["share_pct"] = out.units / total * 100 if total else 0.0
+    return out
+
+
+def ranking(d, store, fams):
+    # Last 14 days actual vs next 14 days forecast per category, with rank in each period (1 = most units)
+    h = d["history"]
+    h = h[(h.store_nbr == store) & h.family.isin(fams) & (h.date > TODAY_DATA - pd.Timedelta(days=14))]
+    fc = d["forecast"][(d["forecast"].store_nbr == store) & d["forecast"].family.isin(fams)]
+    r = pd.DataFrame({"last_14d": h.groupby("family").sales.sum(), "next_14d": fc.groupby("family").forecast.sum()})
+    r = r.fillna(0)
+    r["change_pct"] = (r.next_14d / r.last_14d - 1).where(r.last_14d > 0) * 100
+    r["rank_last"] = r.last_14d.rank(ascending=False, method="first").astype(int)
+    r["rank_next"] = r.next_14d.rank(ascending=False, method="first").astype(int)
+    return r.sort_values("rank_next").reset_index().rename(columns={"index": "family"})
+
+
+def category_why(d, store, family):
+    # Reasons that push the next 14 days up (+) or down (-) vs the last 14 days (src/explain.py)
+    w = d["why"]
+    return w[(w.store_nbr == store) & (w.family == family)].sort_values("effect_pct")[["reason", "effect_pct"]]
+
+
+def month_top(d, month, fams, n=6):
+    # Categories that usually sell most above their average month in `month` (past pattern, not a forecast).
+    # Tiny sellers (< 1 unit/day per store) are skipped: their % swings are noise.
+    p = d["pattern"]
+    ce = d["cat_err"]
+    tiny = set(ce.loc[ce.avg_units_per_day < LOW_SELLER, "family"])
+    return p[(p.month == month) & p.family.isin(fams) & ~p.family.isin(tiny)].nlargest(n, "index_pct")
+
+
+def category_pattern(d, family):
+    return d["pattern"][d["pattern"].family == family].sort_values("month")
+
+
+def avg_daily_forecast(d, store):
+    fc = d["forecast"][d["forecast"].store_nbr == store]
+    return fc.groupby("family").forecast.mean()
+
+
+def replan(plan, stock, daily, safety=1.0):
+    # Re-run the reorder rule (src/reorder.py) for rows whose stock was changed by the user, or for every row
+    # when the safety level is not Normal (buffer x safety). plan: rows of reorder_plan; stock: new stock per
+    # row (same index); daily: avg daily forecast per family. Other rows keep the saved values exactly.
+    plan = plan.copy()
+    changed = stock.ne(plan.stock_SIMULATED)
+    redo = changed | (safety != 1.0)
+    plan["buffer"] = plan.buffer * safety
+    if redo.any():
+        c = plan[redo]
+        avg = c.family.map(daily)
+        new = stock[redo]
+        order = np.ceil((c.forecast_window + c.buffer - new).clip(lower=0))
+        cover = (new / avg).where(avg > 0).round(1)
+        urgent = (cover < URGENT_DAYS) & (avg >= LOW_SELLER)
+        plan.loc[redo, "stock_SIMULATED"] = new
+        plan.loc[redo, "order_qty"] = order
+        plan.loc[redo, "days_of_cover"] = cover
+        plan.loc[redo, "status"] = np.select([urgent, order > 0], ["Urgent", "Reorder"], "OK")
+    plan["stock_changed"] = changed
+    return plan
+
+
+def runs_out(days_of_cover, horizon=14):
+    # Day the stock is expected to run out. Forecast day 1 = 16 Aug, so 1.4 days of cover lasts through
+    # 16 Aug and runs out on 17 Aug; 0 = out on day 1. Empty if there is no demand.
+    if pd.isna(days_of_cover):
+        return "—"
+    if days_of_cover >= horizon:
+        return f"after {TODAY_DATA + pd.Timedelta(days=horizon):%d %b}"
+    return f"{TODAY_DATA + pd.Timedelta(days=int(days_of_cover) + 1):%a %d %b}"
+
+
+def all_stores(d):
+    # One row per store: urgent / reorder counts (simulated stock) and next vs last 14 days units
+    plan, fc, h = d["plan"], d["forecast"], d["history"]
+    out = d["stores"].set_index("store_nbr").copy()
+    out["urgent"] = plan[plan.status == "Urgent"].groupby("store_nbr").size()
+    out["reorder"] = plan[plan.status == "Reorder"].groupby("store_nbr").size()
+    out["next_14d"] = fc.groupby("store_nbr").forecast.sum()
+    out["last_14d"] = h[h.date > TODAY_DATA - pd.Timedelta(days=14)].groupby("store_nbr").sales.sum()
+    out[["urgent", "reorder"]] = out[["urgent", "reorder"]].fillna(0).astype(int)
+    out["change_pct"] = (out.next_14d / out.last_14d - 1) * 100
+    return out.reset_index().sort_values(["urgent", "reorder"], ascending=False)
+
+
+def test_check(d, fams):
+    # Locked test days, all stores: actual vs v2 forecast vs baseline per day (selected categories)
+    t = d["test_daily"][d["test_daily"].family.isin(fams)]
+    return t.groupby("date")[["sales", "pred", "baseline"]].sum().reset_index()
+
+
+def store_holidays(d, store):
+    # Ecuador holidays and events for this store (history start to forecast end), one row per date
+    h = d["holidays"][d["holidays"].store_nbr == store]
+    return h.groupby("date").name.agg(" · ".join).reset_index()
+
+
+def promo_days(d, store, family):
+    # Planned promotions (items on promotion) per forecast day, from raw/store_sales/test.csv via the forecast
+    fc = d["forecast"]
+    return fc[(fc.store_nbr == store) & (fc.family == family)][["date", "onpromotion"]]
+
+
+def order_sheet(rows, store, store_label, planning_note):
+    # Printable HTML order sheet. rows: DataFrame with Category, Order, Window (days), Status
+    rows = rows.rename(columns={"Window (days)": "Window"})
+    body = "".join(f"<tr><td>{r.Category}</td><td class='n'>{r.Order:,}</td><td class='n'>{r.Window}</td>"
+                   f"<td>{r.Status}</td><td class='box'></td></tr>" for r in rows.itertuples())
+    return f"""<!doctype html><html><head><meta charset="utf-8"><title>Order sheet store {store}</title>
+<style>body{{font-family:Inter,Arial,sans-serif;color:#0f172a;margin:32px}}h1{{font-size:20px;margin:0 0 4px}}
+p{{color:#475569;font-size:13px;margin:0 0 16px}}table{{border-collapse:collapse;width:100%;font-size:13px}}
+th,td{{border-bottom:1px solid #e2e8f0;padding:7px 8px;text-align:left}}th{{background:#f8fafc}}
+.n{{text-align:right;font-variant-numeric:tabular-nums}}.box{{width:60px}}
+@media print{{body{{margin:12mm}}}}</style></head><body>
+<h1>Order sheet · {store_label}</h1><p>{planning_note}</p>
+<table><tr><th>Category</th><th class="n">Order (units)</th><th class="n">Window (days)</th><th>Status</th>
+<th>Done ✓</th></tr>{body}</table></body></html>"""
