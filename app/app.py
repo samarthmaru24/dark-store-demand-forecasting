@@ -186,13 +186,6 @@ hero_box.html(f"""<div class='hero'><div>
   <div class='chips'><span class='chip'>Store {store} · {srow.city}</span><span class='chip'>Data today · 15 Aug 2017</span>
   <span class='chip'>Forecast · 16 – 29 Aug 2017</span></div>
 </div>""")
-alert_box = st.empty()     # filled at the end (needs the India and reorder settings)
-kpi_box = st.empty()
-
-t_ov, t_cat, t_sea, t_ro, t_all, t_mod = st.tabs(
-    [":material/space_dashboard: Overview", ":material/category: Category",
-     ":material/celebration: Seasons & festivals", ":material/inventory_2: Reorder",
-     ":material/storefront: All stores", ":material/verified: Model"])
 
 # ---------------- Seasons & festivals (built first: alerts and the Reorder tab use its settings) ----------------
 with t_sea:
