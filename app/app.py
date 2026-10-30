@@ -181,7 +181,7 @@ fams = picked or options
 srow = stores.set_index("store_nbr").loc[store]
 hero_box.html(f"""<div class='hero'><div>
   <div class='brand'>Dark store planner · quick commerce</div>
-  <h1>Demand &amp; reorder</h1>
+  <h1>Demand &amp; Reorder</h1>
   <p>Units each category will sell in the next 14 days, and what to order today.</p></div>
   <div class='chips'><span class='chip'>Store {store} · {srow.city}</span><span class='chip'>Data today · 15 Aug 2017</span>
   <span class='chip'>Forecast · 16 – 29 Aug 2017</span></div>
