@@ -157,7 +157,7 @@ Clean table columns: date, store_nbr, family, sales, onpromotion, is_closed, cit
         5 seeds: 13.55 (+0.17, 1 worse), tuning 14.68 → rejected (closest).
       Pipeline left on v2: python3 run_all.py --retrain → model file, forecast, why, plan, back-tests, Christmas identical (SHA-256). Kept: src/tune.py, features.add_v3_features (unused by v2), model.load_holidays + window(train_start); results.json "experiments_6i"; Model tab line "More tries, none kept". Tests: 15 passed (+ holiday features on known days, promo level 14+ days old). CHECKSUMS 21 OK.
       Lesson: the 6 back-test windows differ a lot (Jan 2017 is unstable); small gains don't hold everywhere. Remaining big lever = #5 short-horizon models (needs my decision on the 14-day rule).
-7. Finish & present — IN PROGRESS (2026-10-30: pushed to GitHub, commit 1c91a51; first CI/CD run 41032487144 green — both jobs, 2 artifacts). TODO: deploy on Streamlit Community Cloud, README, report, slides, 2-minute demo.
+7. Finish & present — IN PROGRESS (2026-10-30: pushed to GitHub, commit 1c91a51; first CI/CD run 41032487144 green — both jobs, 2 artifacts; upload-artifact v7 → 0 warnings). LIVE on Render (free, render.yaml, auto-deploy on push to main): https://dark-store-demand-forecasting.onrender.com — checked: health ok, full dashboard loads, store 44 = 603,921 units / 2 Urgent / 21 Reorder (same as app/data). Brave Shields can show a white page → Shields down or Chrome. TODO: README live link, report, slides, 2-minute demo.
 
 ## For the report
 (all numbers: reports/results.json)

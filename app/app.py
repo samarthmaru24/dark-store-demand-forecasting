@@ -327,21 +327,7 @@ with t_sea:
         fig = go.Figure(go.Bar(
             x=[m[:3] for m in MONTHS], y=pat.index_pct,
             marker=dict(color=[UP if v >= 0 else DOWN for v in pat.index_pct], cornerradius=4,
-                        opacity=[1 if m == m_no else 0.45 for m in pat.month]),
-            customdata=pat.avg_units_day,
-            hovertemplate="%{x}<br>%{y:+.1f}% vs average month<br>%{customdata:,.0f} units/day (all stores)<extra></extra>"))
-        style(fig, 260, "% vs average month").update_layout(hovermode="closest")
-        fig.add_hline(y=0, line=dict(color=MUTED, width=1))
-        st.plotly_chart(fig, width="stretch")
-        best = pat.nlargest(2, "index_pct")
-        note(f"Best months for {nice(fam_s)}: " + ", ".join(f"{MONTHS[m - 1]} ({v:+.0f}%)"
-                                                           for m, v in zip(best.month, best.index_pct)))
-    else:
-        st.caption("No pattern for the selected categories (Books did not sell in every month).")
-
-# ---------------- Reorder ----------------
-with t_ro:
-    st.subheader(f"Reorder list · store {store}")
+                        opaci
     base = d["plan"][(d["plan"].store_nbr == store) & d["plan"].family.isin(fams)]
     r1, r0, r2, r3 = st.columns([1.7, 1.25, 1, 1], vertical_alignment="bottom")
     boost_on = r1.toggle("India extra stock",
