@@ -92,6 +92,14 @@ tests/       test_pipeline.py (needs the data), test_models_and_app.py (runs any
 run_all.py   whole pipeline in one command
 ```
 
+## Deploy on Render (free)
+
+`render.yaml` holds every setting. On [render.com](https://render.com): **New + → Blueprint** → pick this repo →
+**Apply**. It installs `requirements.txt` on Python 3.12.14 and starts
+`streamlit run app/app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true`; health check
+`/_stcore/health`. Every push to `main` redeploys. Free plan: the app sleeps after about 15 minutes without
+visitors, and the first visit after that takes up to about a minute.
+
 ## CI/CD (GitHub Actions)
 
 `.github/workflows/ci.yml` runs on every push and pull request to `main`, and by hand (Actions tab → CI/CD →

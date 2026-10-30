@@ -1,0 +1,15 @@
+# Render Blueprint: the Streamlit dashboard as one free web service.
+# On render.com: New + -> Blueprint -> pick this repo -> Apply. Redeploys on every push to main.
+# The app reads only app/data/ (in git), so no data, model run or secrets are needed.
+services:
+  - type: web
+    name: dark-store-demand-forecasting
+    runtime: python
+    plan: free
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app/app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    healthCheckPath: /_stcore/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.14
